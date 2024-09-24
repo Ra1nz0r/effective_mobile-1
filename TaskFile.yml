@@ -1,0 +1,73 @@
+---
+version: '3'
+
+tasks:
+  run: # название задачи для запуска
+    desc: "Runs all '.go' files."
+    cmds:
+      - go run ./...
+
+  run_s: # название задачи для запуска
+    desc: "Runs all '.go' files."
+    cmds:
+      - go run ./cmd/server
+  
+  run_a: # название задачи для запуска
+    desc: "Runs all '.go' files."
+    cmds:
+      - go run ./cmd/agent
+      
+  test: # название задачи для запуска
+    desc: "Runs all test files without cache and with info."
+    cmds:
+      - go test -v ./... -count=1
+
+  mockgen: # название задачи для запуска
+    desc: "Generates mock files for the storage."
+    cmds:
+      - mockgen -source=internal/storage/metrics.go -destination=internal/storage/mocks/mocks.go -package=mocks
+      
+  d_build: # название задачи для запуска
+    desc: "Build docker container."
+    cmds:
+      - docker build -t scheduler_app:v1 .
+
+  d_run_it: # название задачи для запуска
+    desc: "Run terminal (-it) when container is running."
+    cmds:
+      - docker exec -it sched_app /bin/bash
+
+  d_read_env: # название задачи для запуска
+    desc: "Run docker container with reading all params from '.env'."
+    cmds:
+      - docker run --name="sched_app" -d --env-file .env -p 7540:7540 scheduler_app:v1
+  
+  d_expose: # название задачи для запуска
+    desc: "Run docker through EXPOSE on default 7540 PORT."
+    cmds:
+      - docker run --name="sched_app" -d -P scheduler_app:v1
+
+  d_def_port: # название задачи для запуска
+    desc: "Run docker with default 7540 PORT."
+    cmds:
+      - docker run --name="sched_app" -d -p 7540:7540 scheduler_app:v1
+
+  d_change_port: # название задачи для запуска
+    desc: "Run docker with changing default PORT."
+    cmds:
+      - docker run --name="sched_app" -e "TODO_PORT=7544" -d -p 7544:7544 scheduler_app:v1
+
+  d_change_pass: # название задачи для запуска
+    desc: "Run docker with changing default PASSWORD."
+    cmds:
+      - docker run --name="sched_app" -e "TODO_PASSWORD=yourPass" -d -p 7540:7540 scheduler_app:v1
+
+  d_change_path: # название задачи для запуска
+    desc: "Run docker with changing default database NAME and PATH."
+    cmds:
+      - docker run --name="sched_app" -e "TODO_DBFILE=internal/yourFolder/yourName.db" -d -p 7540:7540 scheduler_app:v1
+
+  d_change_all: # название задачи для запуска
+    desc: "Run docker with changing all default params."
+    cmds:
+      - docker run --name="sched_app" -e "TODO_DBFILE=internal/yourFolder/yourName.db" -e "TODO_PASSWORD=yourPass" -e "TODO_PORT=7544" -d -p 7544:7544 scheduler_app:v1
