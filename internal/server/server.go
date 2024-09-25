@@ -12,31 +12,46 @@ import (
 	"time"
 
 	"github.com/Ra1nz0r/effective_mobile-1/internal/config"
-	hs "github.com/Ra1nz0r/effective_mobile-1/internal/handlers"
+	hd "github.com/Ra1nz0r/effective_mobile-1/internal/handlers"
 	"github.com/Ra1nz0r/effective_mobile-1/internal/logger"
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5"
 )
 
 // Запускает агент, который будет принимать метрики от агента.
 func Run() {
 	config.ServerFlags()
 
-	r := chi.NewRouter()
-
 	if errLog := logger.Initialize(config.DefLogLevel); errLog != nil {
 		log.Fatal(errLog)
 	}
 
+	// ================================================
+	ctx := context.Background()
+
+	conn, errConn := pgx.Connect(ctx, "postgresql://postgres:admin@localhost:5432/library?sslmode=disable")
+	if errConn != nil {
+		log.Fatal(errConn)
+	}
+	defer conn.Close(ctx)
+
+	queries := hd.NewHandleQueries(conn)
+	// ================================================
+
 	logger.Zap.Info("Running handlers.")
 
+	r := chi.NewRouter()
+
 	r.Group(func(r chi.Router) {
-		//r.Use(hs.WithRequestDetails)
-		//r.Post("/update/{type}/{name}/{value}", hs.UpdateMetrics)
+		r.Put("/api/update", queries.UpdateSong)
+		r.Delete("/api/delete", queries.DeleteSong)
+		r.Post("/api/add", queries.AddSongInLibrary)
 	})
 
 	r.Group(func(r chi.Router) {
 		//r.Use(hs.WithResponseDetails)
-		r.Get("/", hs.GetAllMetrics)
+		r.Get("/list", queries.ListAllSongs)
+		r.Get("/", queries.GetAll)
 		//r.Get("/value/{type}/{name}", hs.GetMetricByName)
 	})
 
