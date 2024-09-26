@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"log"
@@ -15,7 +16,8 @@ import (
 	hd "github.com/Ra1nz0r/effective_mobile-1/internal/handlers"
 	"github.com/Ra1nz0r/effective_mobile-1/internal/logger"
 	"github.com/go-chi/chi/v5"
-	"github.com/jackc/pgx/v5"
+
+	_ "github.com/jackc/pgx/v4/stdlib"
 )
 
 // Запускает агент, который будет принимать метрики от агента.
@@ -27,14 +29,10 @@ func Run() {
 	}
 
 	// ================================================
-	ctx := context.Background()
-
-	conn, errConn := pgx.Connect(ctx, "postgresql://postgres:admin@localhost:5432/library?sslmode=disable")
+	conn, errConn := sql.Open("pgx", "postgres://postgres:admin@localhost:5432/library?sslmode=disable")
 	if errConn != nil {
 		log.Fatal(errConn)
 	}
-	defer conn.Close(ctx)
-
 	queries := hd.NewHandleQueries(conn)
 	// ================================================
 

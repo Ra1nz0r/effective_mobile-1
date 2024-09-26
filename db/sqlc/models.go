@@ -5,14 +5,14 @@
 package db
 
 import (
-	"github.com/jackc/pgx/v5/pgtype"
+	"time"
 )
 
 type Library struct {
-	ID          int32       `json:"id"`
-	Group       string      `json:"group"`
-	Song        string      `json:"song"`
-	ReleaseDate pgtype.Date `json:"releaseDate"`
-	Text        pgtype.Text `json:"text"`
-	Patronymic  pgtype.Text `json:"patronymic"`
+	ID          int32     `json:"id"`
+	Group       string    `json:"group"`
+	Song        string    `json:"song"`
+	ReleaseDate time.Time `json:"releaseDate"`
+	Text        string    `json:"text"`
+	Link        string    `json:"link"`
 }

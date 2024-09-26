@@ -5,11 +5,11 @@ RETURNING *;
 -- name: Delete :exec
 DELETE FROM library
 WHERE id = $1;
--- name: FetchParam :exec
+-- name: Fetch :exec
 UPDATE library
 SET "releaseDate" = $2,
     text = $3,
-    patronymic = $4
+    link = $4
 WHERE id = $1;
 -- name: GetOne :one
 SELECT *
@@ -27,9 +27,7 @@ ORDER BY id
 LIMIT $1 OFFSET $2;
 -- name: Update :exec
 UPDATE library
-SET "group" = $2,
-    song = $3,
-    "releaseDate" = $4,
-    text = $5,
-    patronymic = $6
+SET "releaseDate" = $2,
+    text = $3,
+    link = $4
 WHERE id = $1;

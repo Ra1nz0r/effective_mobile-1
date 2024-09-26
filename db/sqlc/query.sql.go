@@ -7,14 +7,13 @@ package db
 
 import (
 	"context"
-
-	"github.com/jackc/pgx/v5/pgtype"
+	"time"
 )
 
 const add = `-- name: Add :one
 INSERT INTO library ("group", song)
 VALUES ($1, $2)
-RETURNING id, "group", song, "releaseDate", text, patronymic
+RETURNING id, "group", song, "releaseDate", text, link
 `
 
 type AddParams struct {
@@ -23,7 +22,7 @@ type AddParams struct {
 }
 
 func (q *Queries) Add(ctx context.Context, arg AddParams) (Library, error) {
-	row := q.db.QueryRow(ctx, add, arg.Group, arg.Song)
+	row := q.db.QueryRowContext(ctx, add, arg.Group, arg.Song)
 	var i Library
 	err := row.Scan(
 		&i.ID,
@@ -31,7 +30,7 @@ func (q *Queries) Add(ctx context.Context, arg AddParams) (Library, error) {
 		&i.Song,
 		&i.ReleaseDate,
 		&i.Text,
-		&i.Patronymic,
+		&i.Link,
 	)
 	return i, err
 }
@@ -42,44 +41,44 @@ WHERE id = $1
 `
 
 func (q *Queries) Delete(ctx context.Context, id int32) error {
-	_, err := q.db.Exec(ctx, delete, id)
+	_, err := q.db.ExecContext(ctx, delete, id)
 	return err
 }
 
-const fetchParam = `-- name: FetchParam :exec
+const fetch = `-- name: Fetch :exec
 UPDATE library
 SET "releaseDate" = $2,
     text = $3,
-    patronymic = $4
+    link = $4
 WHERE id = $1
 `
 
-type FetchParamParams struct {
-	ID          int32       `json:"id"`
-	ReleaseDate pgtype.Date `json:"releaseDate"`
-	Text        pgtype.Text `json:"text"`
-	Patronymic  pgtype.Text `json:"patronymic"`
+type FetchParams struct {
+	ID          int32     `json:"id"`
+	ReleaseDate time.Time `json:"releaseDate"`
+	Text        string    `json:"text"`
+	Link        string    `json:"link"`
 }
 
-func (q *Queries) FetchParam(ctx context.Context, arg FetchParamParams) error {
-	_, err := q.db.Exec(ctx, fetchParam,
+func (q *Queries) Fetch(ctx context.Context, arg FetchParams) error {
+	_, err := q.db.ExecContext(ctx, fetch,
 		arg.ID,
 		arg.ReleaseDate,
 		arg.Text,
-		arg.Patronymic,
+		arg.Link,
 	)
 	return err
 }
 
 const getOne = `-- name: GetOne :one
-SELECT id, "group", song, "releaseDate", text, patronymic
+SELECT id, "group", song, "releaseDate", text, link
 FROM library
 WHERE id = $1
 LIMIT 1
 `
 
 func (q *Queries) GetOne(ctx context.Context, id int32) (Library, error) {
-	row := q.db.QueryRow(ctx, getOne, id)
+	row := q.db.QueryRowContext(ctx, getOne, id)
 	var i Library
 	err := row.Scan(
 		&i.ID,
@@ -87,13 +86,13 @@ func (q *Queries) GetOne(ctx context.Context, id int32) (Library, error) {
 		&i.Song,
 		&i.ReleaseDate,
 		&i.Text,
-		&i.Patronymic,
+		&i.Link,
 	)
 	return i, err
 }
 
 const list = `-- name: List :many
-SELECT id, "group", song, "releaseDate", text, patronymic
+SELECT id, "group", song, "releaseDate", text, link
 FROM library
 ORDER BY id
 LIMIT $1 OFFSET $2
@@ -105,7 +104,7 @@ type ListParams struct {
 }
 
 func (q *Queries) List(ctx context.Context, arg ListParams) ([]Library, error) {
-	rows, err := q.db.Query(ctx, list, arg.Limit, arg.Offset)
+	rows, err := q.db.QueryContext(ctx, list, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
@@ -119,11 +118,14 @@ func (q *Queries) List(ctx context.Context, arg ListParams) ([]Library, error) {
 			&i.Song,
 			&i.ReleaseDate,
 			&i.Text,
-			&i.Patronymic,
+			&i.Link,
 		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -132,13 +134,13 @@ func (q *Queries) List(ctx context.Context, arg ListParams) ([]Library, error) {
 }
 
 const listAll = `-- name: ListAll :many
-SELECT id, "group", song, "releaseDate", text, patronymic
+SELECT id, "group", song, "releaseDate", text, link
 FROM library
 ORDER BY id
 `
 
 func (q *Queries) ListAll(ctx context.Context) ([]Library, error) {
-	rows, err := q.db.Query(ctx, listAll)
+	rows, err := q.db.QueryContext(ctx, listAll)
 	if err != nil {
 		return nil, err
 	}
@@ -152,11 +154,14 @@ func (q *Queries) ListAll(ctx context.Context) ([]Library, error) {
 			&i.Song,
 			&i.ReleaseDate,
 			&i.Text,
-			&i.Patronymic,
+			&i.Link,
 		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -166,31 +171,25 @@ func (q *Queries) ListAll(ctx context.Context) ([]Library, error) {
 
 const update = `-- name: Update :exec
 UPDATE library
-SET "group" = $2,
-    song = $3,
-    "releaseDate" = $4,
-    text = $5,
-    patronymic = $6
+SET "releaseDate" = $2,
+    text = $3,
+    link = $4
 WHERE id = $1
 `
 
 type UpdateParams struct {
-	ID          int32       `json:"id"`
-	Group       string      `json:"group"`
-	Song        string      `json:"song"`
-	ReleaseDate pgtype.Date `json:"releaseDate"`
-	Text        pgtype.Text `json:"text"`
-	Patronymic  pgtype.Text `json:"patronymic"`
+	ID          int32     `json:"id"`
+	ReleaseDate time.Time `json:"releaseDate"`
+	Text        string    `json:"text"`
+	Link        string    `json:"link"`
 }
 
 func (q *Queries) Update(ctx context.Context, arg UpdateParams) error {
-	_, err := q.db.Exec(ctx, update,
+	_, err := q.db.ExecContext(ctx, update,
 		arg.ID,
-		arg.Group,
-		arg.Song,
 		arg.ReleaseDate,
 		arg.Text,
-		arg.Patronymic,
+		arg.Link,
 	)
 	return err
 }
