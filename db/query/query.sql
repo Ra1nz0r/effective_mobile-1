@@ -21,13 +21,34 @@ SELECT *
 FROM library
 ORDER BY id;
 -- name: List :many
-SELECT *
+SELECT id,
+    "group",
+    song,
+    "releaseDate",
+    text,
+    link
 FROM library
+WHERE (
+        LOWER("group") LIKE '%' || LOWER($1) || '%'
+        OR $1 IS NULL
+    )
+    AND (
+        LOWER(song) LIKE '%' || LOWER($2) || '%'
+        OR $2 IS NULL
+    )
+    AND (
+        "releaseDate" >= $3
+        OR $3 IS NULL
+    )
+    AND (
+        LOWER(text) LIKE '%' || LOWER($4) || '%'
+        OR $4 IS NULL
+    )
 ORDER BY id
-LIMIT $1 OFFSET $2;
+LIMIT $5 OFFSET $6;
 -- name: Update :exec
 UPDATE library
 SET "releaseDate" = $2,
-    text = $3,
+    "text" = $3,
     link = $4
 WHERE id = $1;

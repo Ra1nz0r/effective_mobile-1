@@ -1,10 +1,10 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -45,6 +45,7 @@ func (hq *HandleQueries) AddSongInLibrary(w http.ResponseWriter, r *http.Request
 	details, errDetail := services.FetchSongDetails(baseParam.Group, baseParam.Song)
 	if errDetail != nil {
 		logger.Zap.Error(errDetail)
+		// Ошибку для клиента исправить на то что сервер недоступен или невозможно получить данные, добавлено с базовыми
 		http.Error(w, "Error fetching song details", http.StatusInternalServerError)
 		return
 	}
@@ -125,42 +126,52 @@ func (hq *HandleQueries) DeleteSong(w http.ResponseWriter, r *http.Request) {
 // Вызывает метод интерфейса, который возвращает копию локального хранилища.
 // Формат JSON, в виде {"Alloc":146464,"Frees":10,...}.
 func (hq *HandleQueries) ListAllSongs(w http.ResponseWriter, r *http.Request) {
+	// Получаем параметры из запроса
+	group := r.URL.Query().Get("group")
+	song := r.URL.Query().Get("song")
+	releaseDateStr := r.URL.Query().Get("releaseDate")
+	text := r.URL.Query().Get("text")
+	limitStr := r.URL.Query().Get("limit")
+	offsetStr := r.URL.Query().Get("offset")
 
-	limit, errID := strconv.Atoi(r.URL.Query().Get("limit"))
-	if errID != nil || limit < 1 {
-		log.Fatal(errID)
+	// Преобразуем limit и offset в int
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil {
+		limit = 10 // дефолтное значение
+	}
+	offset, err := strconv.Atoi(offsetStr)
+	if err != nil {
+		offset = 0 // дефолтное значение
 	}
 
-	offset, errID := strconv.Atoi(r.URL.Query().Get("offset"))
-	if errID != nil || offset < 0 {
-		log.Fatal(errID)
+	// Преобразуем releaseDate
+	var releaseDate sql.NullTime
+	if releaseDateStr != "" {
+		date, err := time.Parse("2006-01-02", releaseDateStr)
+		if err == nil {
+			releaseDate = sql.NullTime{Time: date, Valid: true}
+		}
 	}
 
-	var rr db.ListParams
-	rr.Limit = int32(limit)
-	rr.Offset = int32(offset)
+	// Создаем параметры для SQL-запроса
+	params := db.ListLibraryParams{
+		Group:       sql.NullString{String: group, Valid: group != ""},
+		Song:        sql.NullString{String: song, Valid: song != ""},
+		ReleaseDate: releaseDate,
+		Text:        sql.NullString{String: text, Valid: text != ""},
+		Limit:       int32(limit),
+		Offset:      int32(offset),
+	}
 
-	res, errUpdate := hq.List(r.Context(), rr)
-	if errUpdate != nil {
-		ErrReturn(fmt.Errorf("can't update task scheduler: %w", errUpdate), 404, w)
+	// Выполняем запрос через SQLC
+	libraries, err := hq.ListLibrary(context.Background(), params)
+	if err != nil {
+		http.Error(w, "Failed to query libraries", http.StatusInternalServerError)
 		return
 	}
 
-	ans, errJSON := json.Marshal(res)
-	if errJSON != nil {
-		logger.Zap.Error(fmt.Errorf("failed attempt json-marshal response: %w", errJSON))
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-
-	w.WriteHeader(http.StatusOK)
-
-	if _, errWrite := w.Write([]byte(ans)); errWrite != nil {
-		logger.Zap.Error("failed attempt WRITE response")
-		return
-	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(libraries)
 }
 
 func (hq *HandleQueries) UpdateSong(w http.ResponseWriter, r *http.Request) {

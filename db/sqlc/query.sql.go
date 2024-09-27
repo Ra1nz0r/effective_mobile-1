@@ -92,19 +92,51 @@ func (q *Queries) GetOne(ctx context.Context, id int32) (Library, error) {
 }
 
 const list = `-- name: List :many
-SELECT id, "group", song, "releaseDate", text, link
+SELECT id,
+    "group",
+    song,
+    "releaseDate",
+    text,
+    link
 FROM library
+WHERE (
+        LOWER("group") LIKE '%' || LOWER($1) || '%'
+        OR $1 IS NULL
+    )
+    AND (
+        LOWER(song) LIKE '%' || LOWER($2) || '%'
+        OR $2 IS NULL
+    )
+    AND (
+        "releaseDate" >= $3
+        OR $3 IS NULL
+    )
+    AND (
+        LOWER(text) LIKE '%' || LOWER($4) || '%'
+        OR $4 IS NULL
+    )
 ORDER BY id
-LIMIT $1 OFFSET $2
+LIMIT $5 OFFSET $6
 `
 
 type ListParams struct {
-	Limit  int32 `json:"limit"`
-	Offset int32 `json:"offset"`
+	Lower       string    `json:"lower"`
+	Lower_2     string    `json:"lower_2"`
+	ReleaseDate time.Time `json:"releaseDate"`
+	Lower_3     string    `json:"lower_3"`
+	Limit       int32     `json:"limit"`
+	Offset      int32     `json:"offset"`
 }
 
 func (q *Queries) List(ctx context.Context, arg ListParams) ([]Library, error) {
-	rows, err := q.db.QueryContext(ctx, list, arg.Limit, arg.Offset)
+	rows, err := q.db.QueryContext(ctx, list,
+		arg.Lower,
+		arg.Lower_2,
+		arg.ReleaseDate,
+		arg.Lower_3,
+		arg.Limit,
+		arg.Offset,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -172,7 +204,7 @@ func (q *Queries) ListAll(ctx context.Context) ([]Library, error) {
 const update = `-- name: Update :exec
 UPDATE library
 SET "releaseDate" = $2,
-    text = $3,
+    "text" = $3,
     link = $4
 WHERE id = $1
 `
