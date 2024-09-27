@@ -7,6 +7,7 @@ package db
 
 import (
 	"context"
+	"database/sql"
 	"time"
 )
 
@@ -91,52 +92,14 @@ func (q *Queries) GetOne(ctx context.Context, id int32) (Library, error) {
 	return i, err
 }
 
-const list = `-- name: List :many
-SELECT id,
-    "group",
-    song,
-    "releaseDate",
-    text,
-    link
+const listAll = `-- name: ListAll :many
+SELECT id, "group", song, "releaseDate", text, link
 FROM library
-WHERE (
-        LOWER("group") LIKE '%' || LOWER($1) || '%'
-        OR $1 IS NULL
-    )
-    AND (
-        LOWER(song) LIKE '%' || LOWER($2) || '%'
-        OR $2 IS NULL
-    )
-    AND (
-        "releaseDate" >= $3
-        OR $3 IS NULL
-    )
-    AND (
-        LOWER(text) LIKE '%' || LOWER($4) || '%'
-        OR $4 IS NULL
-    )
 ORDER BY id
-LIMIT $5 OFFSET $6
 `
 
-type ListParams struct {
-	Lower       string    `json:"lower"`
-	Lower_2     string    `json:"lower_2"`
-	ReleaseDate time.Time `json:"releaseDate"`
-	Lower_3     string    `json:"lower_3"`
-	Limit       int32     `json:"limit"`
-	Offset      int32     `json:"offset"`
-}
-
-func (q *Queries) List(ctx context.Context, arg ListParams) ([]Library, error) {
-	rows, err := q.db.QueryContext(ctx, list,
-		arg.Lower,
-		arg.Lower_2,
-		arg.ReleaseDate,
-		arg.Lower_3,
-		arg.Limit,
-		arg.Offset,
-	)
+func (q *Queries) ListAll(ctx context.Context) ([]Library, error) {
+	rows, err := q.db.QueryContext(ctx, listAll)
 	if err != nil {
 		return nil, err
 	}
@@ -165,14 +128,47 @@ func (q *Queries) List(ctx context.Context, arg ListParams) ([]Library, error) {
 	return items, nil
 }
 
-const listAll = `-- name: ListAll :many
+const listWithFilters = `-- name: ListWithFilters :many
 SELECT id, "group", song, "releaseDate", text, link
 FROM library
+WHERE (
+        "group" ILIKE '%' || $1 || '%'
+        OR $1 IS NULL
+    )
+    AND (
+        song ILIKE '%' || $2 || '%'
+        OR $2 IS NULL
+    )
+    AND (
+        "releaseDate" >= $3
+        OR $3 IS NULL
+    )
+    AND (
+        "text" ILIKE '%' || $4 || '%'
+        OR $4 IS NULL
+    )
 ORDER BY id
+LIMIT $5 OFFSET $6
 `
 
-func (q *Queries) ListAll(ctx context.Context) ([]Library, error) {
-	rows, err := q.db.QueryContext(ctx, listAll)
+type ListWithFiltersParams struct {
+	Column1     sql.NullString `json:"column_1"`
+	Column2     sql.NullString `json:"column_2"`
+	ReleaseDate time.Time      `json:"releaseDate"`
+	Column4     sql.NullString `json:"column_4"`
+	Limit       int32          `json:"limit"`
+	Offset      int32          `json:"offset"`
+}
+
+func (q *Queries) ListWithFilters(ctx context.Context, arg ListWithFiltersParams) ([]Library, error) {
+	rows, err := q.db.QueryContext(ctx, listWithFilters,
+		arg.Column1,
+		arg.Column2,
+		arg.ReleaseDate,
+		arg.Column4,
+		arg.Limit,
+		arg.Offset,
+	)
 	if err != nil {
 		return nil, err
 	}

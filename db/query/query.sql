@@ -20,20 +20,15 @@ LIMIT 1;
 SELECT *
 FROM library
 ORDER BY id;
--- name: List :many
-SELECT id,
-    "group",
-    song,
-    "releaseDate",
-    text,
-    link
+-- name: ListWithFilters :many
+SELECT *
 FROM library
 WHERE (
-        LOWER("group") LIKE '%' || LOWER($1) || '%'
+        "group" ILIKE '%' || $1 || '%'
         OR $1 IS NULL
     )
     AND (
-        LOWER(song) LIKE '%' || LOWER($2) || '%'
+        song ILIKE '%' || $2 || '%'
         OR $2 IS NULL
     )
     AND (
@@ -41,7 +36,7 @@ WHERE (
         OR $3 IS NULL
     )
     AND (
-        LOWER(text) LIKE '%' || LOWER($4) || '%'
+        "text" ILIKE '%' || $4 || '%'
         OR $4 IS NULL
     )
 ORDER BY id

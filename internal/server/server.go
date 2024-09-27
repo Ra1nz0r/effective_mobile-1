@@ -48,7 +48,7 @@ func Run() {
 
 	r.Group(func(r chi.Router) {
 		//r.Use(hs.WithResponseDetails)
-		r.Get("/list", queries.ListAllSongs)
+		r.Get("/list", queries.ListAllSongsWithFilters)
 		r.Get("/", queries.GetAll)
 		//r.Get("/value/{type}/{name}", hs.GetMetricByName)
 	})

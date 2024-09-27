@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -125,53 +124,61 @@ func (hq *HandleQueries) DeleteSong(w http.ResponseWriter, r *http.Request) {
 // результирующей карте при получении GET запроса.
 // Вызывает метод интерфейса, который возвращает копию локального хранилища.
 // Формат JSON, в виде {"Alloc":146464,"Frees":10,...}.
-func (hq *HandleQueries) ListAllSongs(w http.ResponseWriter, r *http.Request) {
-	// Получаем параметры из запроса
+func (hq *HandleQueries) ListAllSongsWithFilters(w http.ResponseWriter, r *http.Request) {
+	// Чтение параметров запроса из URL.
 	group := r.URL.Query().Get("group")
 	song := r.URL.Query().Get("song")
-	releaseDateStr := r.URL.Query().Get("releaseDate")
+	releaseDate := r.URL.Query().Get("releaseDate")
 	text := r.URL.Query().Get("text")
-	limitStr := r.URL.Query().Get("limit")
-	offsetStr := r.URL.Query().Get("offset")
 
-	// Преобразуем limit и offset в int
-	limit, err := strconv.Atoi(limitStr)
-	if err != nil {
-		limit = 10 // дефолтное значение
-	}
-	offset, err := strconv.Atoi(offsetStr)
-	if err != nil {
-		offset = 0 // дефолтное значение
+	limit, errLimit := strconv.Atoi(r.URL.Query().Get("limit"))
+	if errLimit != nil || limit <= 0 {
+		limit = 10
 	}
 
-	// Преобразуем releaseDate
-	var releaseDate sql.NullTime
-	if releaseDateStr != "" {
-		date, err := time.Parse("2006-01-02", releaseDateStr)
-		if err == nil {
-			releaseDate = sql.NullTime{Time: date, Valid: true}
+	offset, errOffset := strconv.Atoi(r.URL.Query().Get("offset"))
+	if errOffset != nil || offset < 0 {
+		offset = 0
+	}
+
+	params := db.ListWithFiltersParams{
+		Column1: sql.NullString{String: group, Valid: group != ""},
+		Column2: sql.NullString{String: song, Valid: song != ""},
+		Column4: sql.NullString{String: text, Valid: text != ""},
+		Limit:   int32(limit),
+		Offset:  int32(offset),
+	}
+
+	var errParse error
+	if releaseDate != "" {
+		// Приводим дату к нужному формату и обновляем дату в FetchParams.
+		params.ReleaseDate, errParse = time.Parse("02.01.2006", releaseDate)
+		if errParse != nil {
+			logger.Zap.Error("Error parsing date: %w", errParse)
 		}
 	}
 
-	// Создаем параметры для SQL-запроса
-	params := db.ListLibraryParams{
-		Group:       sql.NullString{String: group, Valid: group != ""},
-		Song:        sql.NullString{String: song, Valid: song != ""},
-		ReleaseDate: releaseDate,
-		Text:        sql.NullString{String: text, Valid: text != ""},
-		Limit:       int32(limit),
-		Offset:      int32(offset),
-	}
-
-	// Выполняем запрос через SQLC
-	libraries, err := hq.ListLibrary(context.Background(), params)
-	if err != nil {
-		http.Error(w, "Failed to query libraries", http.StatusInternalServerError)
+	res, errUpdate := hq.ListWithFilters(r.Context(), params)
+	if errUpdate != nil {
+		ErrReturn(fmt.Errorf("can't update task scheduler: %w", errUpdate), 404, w)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(libraries)
+	ans, errJSON := json.Marshal(res)
+	if errJSON != nil {
+		logger.Zap.Error(fmt.Errorf("failed attempt json-marshal response: %w", errJSON))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+
+	w.WriteHeader(http.StatusOK)
+
+	if _, errWrite := w.Write([]byte(ans)); errWrite != nil {
+		logger.Zap.Error("failed attempt WRITE response")
+		return
+	}
 }
 
 func (hq *HandleQueries) UpdateSong(w http.ResponseWriter, r *http.Request) {
