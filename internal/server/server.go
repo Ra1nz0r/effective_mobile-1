@@ -15,6 +15,7 @@ import (
 	"github.com/Ra1nz0r/effective_mobile-1/internal/config"
 	hd "github.com/Ra1nz0r/effective_mobile-1/internal/handlers"
 	"github.com/Ra1nz0r/effective_mobile-1/internal/logger"
+	"github.com/Ra1nz0r/effective_mobile-1/internal/services"
 	"github.com/go-chi/chi/v5"
 
 	_ "github.com/jackc/pgx/v4/stdlib"
@@ -28,19 +29,35 @@ func Run() {
 		log.Fatal(errLog)
 	}
 
+	dbURL := "postgres://postgres:admin@localhost:5432/library?sslmode=disable" // вынести в конфиг или енв
+
 	// ================================================
-	conn, errConn := sql.Open("pgx", "postgres://postgres:admin@localhost:5432/library?sslmode=disable")
+	conn, errConn := sql.Open("pgx", dbURL) // вынести в конфиг или енв, драйвер
 	if errConn != nil {
 		log.Fatal(errConn)
 	}
 	queries := hd.NewHandleQueries(conn)
 	// ================================================
 
+	// Проверяем существование table в базе данных.
+	exists, errExs := services.TableExists(conn, "library") // вынести в конфиг или енв, лайбрари
+	if errExs != nil {
+		log.Fatalf("Failed to check if table exists: %v", errExs)
+	}
+
+	// Создаём table, если он не существует.
+	if !exists {
+		if errRunMigr := services.RunMigrations(dbURL); errRunMigr != nil {
+			log.Fatalf("Failed to run migrations: %v", errConn)
+		}
+	}
+	// ================================================
+
 	logger.Zap.Info("Running handlers.")
 
 	r := chi.NewRouter()
 
-	r.Group(func(r chi.Router) {
+	r.Group(func(r chi.Router) { // исправить эндпойнты на другие
 		r.Put("/api/update", queries.UpdateSong)
 		r.Delete("/api/delete", queries.DeleteSong)
 		r.Post("/api/add", queries.AddSongInLibrary)
