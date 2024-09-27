@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	db "github.com/Ra1nz0r/effective_mobile-1/db/sqlc"
@@ -176,6 +177,50 @@ func (hq *HandleQueries) ListAllSongsWithFilters(w http.ResponseWriter, r *http.
 	w.WriteHeader(http.StatusOK)
 
 	if _, errWrite := w.Write([]byte(ans)); errWrite != nil {
+		logger.Zap.Error("failed attempt WRITE response")
+		return
+	}
+}
+
+// songs/verse?id=1&page=1
+func (hq *HandleQueries) TextSongWithPagination(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+
+	songID, errID := strconv.Atoi(query.Get("id"))
+	if errID != nil || songID < 1 {
+		http.Error(w, "Invalid song id", http.StatusBadRequest)
+		return
+	}
+
+	pageStr := query.Get("page")
+	page, err := strconv.Atoi(pageStr)
+	if err != nil {
+		http.Error(w, "Invalid page", http.StatusBadRequest)
+	}
+
+	// Получаем текст песни из базы данных
+	songText, errSG := hq.GetText(r.Context(), int32(songID))
+	if errSG != nil {
+		http.Error(w, "Error fetching song text", http.StatusInternalServerError)
+		return
+	}
+
+	// Разбиваем текст на куплеты по символу "\n\n"
+	verses := strings.Split(songText, "\n\n")
+
+	// Проверяем, не выходит ли запрашиваемая страница за пределы
+	if page > len(verses) || page < 1 {
+		http.Error(w, "Page out of range", http.StatusNotFound)
+		return
+	}
+
+	verse := strings.ReplaceAll(verses[page-1], "\n", "\n")
+
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+
+	w.WriteHeader(http.StatusOK)
+
+	if _, errWrite := w.Write([]byte(verse)); errWrite != nil {
 		logger.Zap.Error("failed attempt WRITE response")
 		return
 	}

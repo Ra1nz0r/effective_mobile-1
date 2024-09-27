@@ -16,6 +16,11 @@ SELECT *
 FROM library
 WHERE id = $1
 LIMIT 1;
+-- name: GetText :one
+SELECT text
+FROM library
+WHERE id = $1
+LIMIT 1;
 -- name: ListAll :many
 SELECT *
 FROM library

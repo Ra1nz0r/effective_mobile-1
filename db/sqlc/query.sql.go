@@ -92,6 +92,20 @@ func (q *Queries) GetOne(ctx context.Context, id int32) (Library, error) {
 	return i, err
 }
 
+const getText = `-- name: GetText :one
+SELECT text
+FROM library
+WHERE id = $1
+LIMIT 1
+`
+
+func (q *Queries) GetText(ctx context.Context, id int32) (string, error) {
+	row := q.db.QueryRowContext(ctx, getText, id)
+	var text string
+	err := row.Scan(&text)
+	return text, err
+}
+
 const listAll = `-- name: ListAll :many
 SELECT id, "group", song, "releaseDate", text, link
 FROM library

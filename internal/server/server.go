@@ -21,7 +21,7 @@ import (
 	_ "github.com/jackc/pgx/v4/stdlib"
 )
 
-// Запускает агент, который будет принимать метрики от агента.
+// Запускает сервер.
 func Run() {
 	config.ServerFlags()
 
@@ -67,7 +67,7 @@ func Run() {
 		//r.Use(hs.WithResponseDetails)
 		r.Get("/list", queries.ListAllSongsWithFilters)
 		r.Get("/", queries.GetAll)
-		//r.Get("/value/{type}/{name}", hs.GetMetricByName)
+		r.Get("/songs/verse", queries.TextSongWithPagination)
 	})
 
 	logger.Zap.Info(fmt.Sprintf("Starting server on: '%s'", config.DefServerHost))
