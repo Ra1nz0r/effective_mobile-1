@@ -16,6 +16,7 @@ type Config struct {
 	DatabaseDriver   string `mapstructure:"DB_DRIVER"`
 }
 
+// LoadConfig загружает из файла '.env' переменные окружения.
 func LoadConfig(path string) (config Config, err error) {
 	viper.AddConfigPath(path)
 	viper.SetConfigName(".env")

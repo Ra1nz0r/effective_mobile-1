@@ -18,7 +18,7 @@ import (
 
 type HandleQueries struct {
 	*db.Queries
-	cfg cfg.Config
+	cfg.Config
 }
 
 func NewHandlerQueries(connect *sql.DB, cfg cfg.Config) *HandleQueries {
@@ -45,7 +45,7 @@ func (hq *HandleQueries) AddSongInLibrary(w http.ResponseWriter, r *http.Request
 	}
 
 	// Делаем запрос во внешний API для получения дополнительной информации о песне.
-	details, errDetail := services.FetchSongDetails(baseParam.Group, baseParam.Song, hq.cfg.ExternalApiURL)
+	details, errDetail := services.FetchSongDetails(baseParam.Group, baseParam.Song, hq.ExternalApiURL)
 	if errDetail != nil {
 		logger.Zap.Error(errDetail)
 		http.Error(
@@ -104,14 +104,14 @@ func (hq *HandleQueries) DeleteSong(w http.ResponseWriter, r *http.Request) {
 	id, errID := strconv.Atoi(r.URL.Query().Get("id"))
 	if errID != nil || id < 1 {
 		logger.Zap.Error(fmt.Errorf("invalid string to number conversion or ID number: DeleteSong"))
-		ErrReturn(fmt.Errorf("invalid string to number conversion or ID number"), 404, w)
+		ErrReturn(fmt.Errorf("invalid string to number conversion or ID number"), http.StatusBadRequest, w)
 		return
 	}
 
 	// Проверям существование задачи и возвращаем ошибку, если её нет в базе данных.
 	_, errGeted := hq.GetOne(r.Context(), int32(id))
 	if errGeted != nil {
-		ErrReturn(fmt.Errorf("the ID you entered does not exist: %w", errGeted), 404, w)
+		ErrReturn(fmt.Errorf("the ID you entered does not exist: %w", errGeted), http.StatusBadRequest, w)
 		return
 	}
 
@@ -144,7 +144,7 @@ func (hq *HandleQueries) ListAllSongsWithFilters(w http.ResponseWriter, r *http.
 
 	limit, errLimit := strconv.Atoi(r.URL.Query().Get("limit"))
 	if errLimit != nil || limit <= 0 {
-		limit = hq.cfg.PaginationLimit
+		limit = hq.PaginationLimit
 	}
 
 	offset, errOffset := strconv.Atoi(r.URL.Query().Get("offset"))
@@ -172,7 +172,7 @@ func (hq *HandleQueries) ListAllSongsWithFilters(w http.ResponseWriter, r *http.
 
 	res, errUpdate := hq.ListWithFilters(r.Context(), params)
 	if errUpdate != nil {
-		ErrReturn(fmt.Errorf("can't update task scheduler: %w", errUpdate), 404, w)
+		ErrReturn(fmt.Errorf("can't update task scheduler: %w", errUpdate), http.StatusBadRequest, w)
 		return
 	}
 
@@ -226,7 +226,7 @@ func (hq *HandleQueries) TextSongWithPagination(w http.ResponseWriter, r *http.R
 
 	verse := strings.ReplaceAll(verses[page-1], "\n", "\n")
 
-	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	w.Header().Set("Content-Type", "text/plain; charset=UTF-8")
 
 	w.WriteHeader(http.StatusOK)
 
@@ -258,13 +258,13 @@ func (hq *HandleQueries) UpdateSong(w http.ResponseWriter, r *http.Request) {
 	upd.ReleaseDate, errParse = time.Parse("02.01.2006", sd.ReleaseDate)
 	if errParse != nil {
 		logger.Zap.Error("Error parsing date: %w", errParse)
-		ErrReturn(fmt.Errorf("can't update task scheduler: %w", errParse), 404, w)
+		ErrReturn(fmt.Errorf("can't update task scheduler: %w", errParse), http.StatusBadRequest, w)
 		return
 	}
 
 	// Делаем запрос и обновляем параметры песни в базе данных, в соответствии с полученными.
 	if errUpdate := hq.Update(r.Context(), upd); errUpdate != nil {
-		ErrReturn(fmt.Errorf("can't update task scheduler: %w", errUpdate), 404, w)
+		ErrReturn(fmt.Errorf("can't update task scheduler: %w", errUpdate), http.StatusBadRequest, w)
 		return
 	}
 
@@ -276,4 +276,57 @@ func (hq *HandleQueries) UpdateSong(w http.ResponseWriter, r *http.Request) {
 		//logerr.ErrEvent("failed attempt WRITE response", errWrite)
 		return
 	}
+}
+
+// WithRequestDetails добавляет дополнительный код для регистрации сведений о запросе.
+func (hs *HandleQueries) WithRequestDetails(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+
+		h.ServeHTTP(w, r)
+
+		logger.Zap.Info(
+			"URI:", r.RequestURI,
+			"Method:", r.Method,
+			"Duration:", time.Since(start),
+		)
+	})
+}
+
+// WithResponseDetails добавляет дополнительный код для регистрации сведений об ответе.
+func (hs *HandleQueries) WithResponseDetails(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		lw := logginResponseWriter{
+			ResponseWriter: w,
+			status:         0,
+			size:           0,
+		}
+
+		h.ServeHTTP(&lw, r)
+
+		logger.Zap.Info(
+			"URI:", r.RequestURI,
+			"Status:", lw.status,
+			"Size:", lw.size,
+			"Duration:", time.Since(start),
+		)
+	})
+}
+
+type logginResponseWriter struct {
+	http.ResponseWriter
+	status int
+	size   int
+}
+
+func (r *logginResponseWriter) Write(b []byte) (int, error) {
+	size, err := r.ResponseWriter.Write(b)
+	r.size += size
+	return size, err
+}
+
+func (r *logginResponseWriter) WriteHeader(statusCode int) {
+	r.ResponseWriter.WriteHeader(statusCode)
+	r.status = statusCode
 }

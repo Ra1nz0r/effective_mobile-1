@@ -15,7 +15,9 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
-// Функция для запроса к внешнему API
+// FetchSongDetails делает запрос во внешний API и возвращает полученные сведения.
+// Формат запроса: http://localhost:7777/info?group='group name'&song='song name'.
+// Возвращает ошибку в случае неудачи.
 func FetchSongDetails(group, song, externalApiURL string) (*models.SongDetail, error) {
 	fullURL := fmt.Sprintf("%s?group=%s&song=%s", externalApiURL, url.PathEscape(group), url.PathEscape(song))
 
@@ -42,6 +44,7 @@ func FetchSongDetails(group, song, externalApiURL string) (*models.SongDetail, e
 	return &songDetail, nil
 }
 
+// RunMigrations запускает миграцию Up по указанному пути.
 func RunMigrations(databaseURL, migrationPath string) error {
 	m, err := migrate.New(migrationPath, databaseURL)
 	if err != nil {
@@ -57,7 +60,7 @@ func RunMigrations(databaseURL, migrationPath string) error {
 	return nil
 }
 
-// Проверка существования таблицы
+// TableExists проверяет существование table в базе данных.
 func TableExists(db *sql.DB, tableName string) (bool, error) {
 	var exists bool
 	query := fmt.Sprintf(`

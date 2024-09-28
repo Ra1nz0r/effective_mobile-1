@@ -9,6 +9,7 @@ import (
 )
 
 type ZapService interface {
+	Debug(fields ...interface{})
 	Info(fields ...interface{})
 	Error(fields ...interface{})
 	Fatal(fields ...interface{})
@@ -20,6 +21,7 @@ type ZapStorage struct {
 
 var Zap ZapService = &ZapStorage{zap.NewNop()}
 
+// Initialize инициализирует логгер.
 func Initialize(level string) error {
 	lvl, err := zap.ParseAtomicLevel(level)
 	if err != nil {
@@ -45,14 +47,22 @@ func Initialize(level string) error {
 	return nil
 }
 
+// Debug логирует сообщения уровня DEBUG.
+func (z *ZapStorage) Debug(fields ...interface{}) {
+	z.Logger.Sugar().Debugln(fields...)
+}
+
+// Info логирует сообщения уровня INFO.
 func (z *ZapStorage) Info(fields ...interface{}) {
 	z.Logger.Sugar().Infoln(fields...)
 }
 
+// Error логирует сообщения уровня ERROR.
 func (z *ZapStorage) Error(fields ...interface{}) {
 	z.Logger.Sugar().Errorln(fields...)
 }
 
+// Fatal логирует сообщения уровня FATAL.
 func (z *ZapStorage) Fatal(fields ...interface{}) {
 	z.Logger.Sugar().Fatalln(fields...)
 }
