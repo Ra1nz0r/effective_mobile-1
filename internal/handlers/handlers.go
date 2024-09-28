@@ -19,9 +19,9 @@ type HandleQueries struct {
 	*db.Queries
 }
 
-func NewHandleQueries(conn *sql.DB) *HandleQueries {
+func NewHandlerQueries(connect *sql.DB) *HandleQueries {
 	return &HandleQueries{
-		db.New(conn),
+		db.New(connect),
 	}
 }
 
@@ -45,8 +45,15 @@ func (hq *HandleQueries) AddSongInLibrary(w http.ResponseWriter, r *http.Request
 	details, errDetail := services.FetchSongDetails(baseParam.Group, baseParam.Song)
 	if errDetail != nil {
 		logger.Zap.Error(errDetail)
-		// Ошибку для клиента исправить на то что сервер недоступен или невозможно получить данные, добавлено с базовыми
-		http.Error(w, "Error fetching song details", http.StatusInternalServerError)
+		http.Error(
+			w,
+			`
+			Unable to get additional information about the song.
+            There is no data or the server is unavailable.
+			The song will be added to the database without additional information.
+			`,
+			http.StatusInternalServerError,
+		)
 		return
 	}
 
@@ -156,6 +163,7 @@ func (hq *HandleQueries) ListAllSongsWithFilters(w http.ResponseWriter, r *http.
 		params.ReleaseDate, errParse = time.Parse("02.01.2006", releaseDate)
 		if errParse != nil {
 			logger.Zap.Error("Error parsing date: %w", errParse)
+			return
 		}
 	}
 
@@ -184,18 +192,17 @@ func (hq *HandleQueries) ListAllSongsWithFilters(w http.ResponseWriter, r *http.
 
 // songs/verse?id=1&page=1
 func (hq *HandleQueries) TextSongWithPagination(w http.ResponseWriter, r *http.Request) {
-	query := r.URL.Query()
-
-	songID, errID := strconv.Atoi(query.Get("id"))
+	songID, errID := strconv.Atoi(r.URL.Query().Get("id"))
 	if errID != nil || songID < 1 {
 		http.Error(w, "Invalid song id", http.StatusBadRequest)
 		return
 	}
 
-	pageStr := query.Get("page")
-	page, err := strconv.Atoi(pageStr)
-	if err != nil {
+	pageStr := r.URL.Query().Get("page")
+	page, errPage := strconv.Atoi(pageStr)
+	if errPage != nil {
 		http.Error(w, "Invalid page", http.StatusBadRequest)
+		return
 	}
 
 	// Получаем текст песни из базы данных

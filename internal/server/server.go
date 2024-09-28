@@ -36,7 +36,7 @@ func Run() {
 	if errConn != nil {
 		log.Fatal(errConn)
 	}
-	queries := hd.NewHandleQueries(conn)
+	queries := hd.NewHandlerQueries(conn)
 	// ================================================
 
 	// Проверяем существование table в базе данных.
