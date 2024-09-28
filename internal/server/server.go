@@ -15,7 +15,7 @@ import (
 	"github.com/Ra1nz0r/effective_mobile-1/internal/config"
 	hd "github.com/Ra1nz0r/effective_mobile-1/internal/handlers"
 	"github.com/Ra1nz0r/effective_mobile-1/internal/logger"
-	"github.com/Ra1nz0r/effective_mobile-1/internal/services"
+	srv "github.com/Ra1nz0r/effective_mobile-1/internal/services"
 	"github.com/go-chi/chi/v5"
 
 	_ "github.com/jackc/pgx/v4/stdlib"
@@ -23,32 +23,42 @@ import (
 
 // Запускает сервер.
 func Run() {
-	config.ServerFlags()
+	// Загружаем переменные окружения из '.env' файла.
+	cfg, errLoad := config.LoadConfig(".")
+	if errLoad != nil {
+		log.Fatal("cannot load config", errLoad)
+	}
 
-	if errLog := logger.Initialize(config.DefLogLevel); errLog != nil {
+	if errLog := logger.Initialize(cfg.LogLevel); errLog != nil {
 		log.Fatal(errLog)
 	}
 
-	dbURL := "postgres://postgres:admin@localhost:5432/library?sslmode=disable" // вынести в конфиг или енв
+	dbURL := fmt.Sprintf("postgresql://%s:%s@%s:%s/%s?sslmode=disable",
+		cfg.DatabaseUser,
+		cfg.DatabasePassword,
+		cfg.DatabaseHost,
+		cfg.DatabasePort,
+		cfg.DatabaseName,
+	)
 
 	// ================================================
-	conn, errConn := sql.Open("pgx", dbURL) // вынести в конфиг или енв, драйвер
+	connect, errConn := sql.Open(cfg.DatabaseDriver, dbURL)
 	if errConn != nil {
-		log.Fatal(errConn)
+		logger.Zap.Fatal(errConn)
 	}
-	queries := hd.NewHandlerQueries(conn)
+	queries := hd.NewHandlerQueries(connect, cfg)
 	// ================================================
 
 	// Проверяем существование table в базе данных.
-	exists, errExs := services.TableExists(conn, "library") // вынести в конфиг или енв, лайбрари
+	exists, errExs := srv.TableExists(connect, "library")
 	if errExs != nil {
-		log.Fatalf("Failed to check if table exists: %v", errExs)
+		logger.Zap.Fatal(fmt.Errorf("failed to check if table exists: %w", errExs))
 	}
 
 	// Создаём table, если он не существует.
 	if !exists {
-		if errRunMigr := services.RunMigrations(dbURL); errRunMigr != nil {
-			log.Fatalf("Failed to run migrations: %v", errConn)
+		if errRunMigr := srv.RunMigrations(dbURL, cfg.MigrationPath); errRunMigr != nil {
+			logger.Zap.Fatal(fmt.Errorf("failed to run migrations: %w", errConn))
 		}
 	}
 	// ================================================
@@ -58,22 +68,22 @@ func Run() {
 	r := chi.NewRouter()
 
 	r.Group(func(r chi.Router) { // исправить эндпойнты на другие
-		r.Put("/api/update", queries.UpdateSong)
 		r.Delete("/api/delete", queries.DeleteSong)
+		r.Get("/list", queries.ListAllSongsWithFilters)
+		r.Get("/songs/verse", queries.TextSongWithPagination)
 		r.Post("/api/add", queries.AddSongInLibrary)
+		r.Put("/api/update", queries.UpdateSong)
 	})
 
 	r.Group(func(r chi.Router) {
 		//r.Use(hs.WithResponseDetails)
-		r.Get("/list", queries.ListAllSongsWithFilters)
-		r.Get("/", queries.GetAll)
-		r.Get("/songs/verse", queries.TextSongWithPagination)
+		// Разбить по переопределённым методам
 	})
 
-	logger.Zap.Info(fmt.Sprintf("Starting server on: '%s'", config.DefServerHost))
+	logger.Zap.Info(fmt.Sprintf("Starting server on: '%s'", cfg.ServerHost))
 
 	srv := http.Server{
-		Addr:         config.DefServerHost,
+		Addr:         cfg.ServerHost,
 		Handler:      r,
 		ReadTimeout:  5 * time.Minute,
 		WriteTimeout: 5 * time.Minute,

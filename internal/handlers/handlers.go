@@ -10,6 +10,7 @@ import (
 	"time"
 
 	db "github.com/Ra1nz0r/effective_mobile-1/db/sqlc"
+	cfg "github.com/Ra1nz0r/effective_mobile-1/internal/config"
 	"github.com/Ra1nz0r/effective_mobile-1/internal/logger"
 	"github.com/Ra1nz0r/effective_mobile-1/internal/models"
 	"github.com/Ra1nz0r/effective_mobile-1/internal/services"
@@ -17,11 +18,13 @@ import (
 
 type HandleQueries struct {
 	*db.Queries
+	cfg cfg.Config
 }
 
-func NewHandlerQueries(connect *sql.DB) *HandleQueries {
+func NewHandlerQueries(connect *sql.DB, cfg cfg.Config) *HandleQueries {
 	return &HandleQueries{
 		db.New(connect),
+		cfg,
 	}
 }
 
@@ -42,7 +45,7 @@ func (hq *HandleQueries) AddSongInLibrary(w http.ResponseWriter, r *http.Request
 	}
 
 	// Делаем запрос во внешний API для получения дополнительной информации о песне.
-	details, errDetail := services.FetchSongDetails(baseParam.Group, baseParam.Song)
+	details, errDetail := services.FetchSongDetails(baseParam.Group, baseParam.Song, hq.cfg.ExternalApiURL)
 	if errDetail != nil {
 		logger.Zap.Error(errDetail)
 		http.Error(
@@ -141,7 +144,7 @@ func (hq *HandleQueries) ListAllSongsWithFilters(w http.ResponseWriter, r *http.
 
 	limit, errLimit := strconv.Atoi(r.URL.Query().Get("limit"))
 	if errLimit != nil || limit <= 0 {
-		limit = 10
+		limit = hq.cfg.PaginationLimit
 	}
 
 	offset, errOffset := strconv.Atoi(r.URL.Query().Get("offset"))
@@ -206,14 +209,14 @@ func (hq *HandleQueries) TextSongWithPagination(w http.ResponseWriter, r *http.R
 	}
 
 	// Получаем текст песни из базы данных
-	songText, errSG := hq.GetText(r.Context(), int32(songID))
+	song, errSG := hq.GetText(r.Context(), int32(songID))
 	if errSG != nil {
 		http.Error(w, "Error fetching song text", http.StatusInternalServerError)
 		return
 	}
 
 	// Разбиваем текст на куплеты по символу "\n\n"
-	verses := strings.Split(songText, "\n\n")
+	verses := strings.Split(song.Text, "\n\n")
 
 	// Проверяем, не выходит ли запрашиваемая страница за пределы
 	if page > len(verses) || page < 1 {
@@ -227,7 +230,9 @@ func (hq *HandleQueries) TextSongWithPagination(w http.ResponseWriter, r *http.R
 
 	w.WriteHeader(http.StatusOK)
 
-	if _, errWrite := w.Write([]byte(verse)); errWrite != nil {
+	result := fmt.Sprintf("Group: %s, Song: %s\n\n%s", song.Group, song.Song, verse)
+
+	if _, errWrite := w.Write([]byte(result)); errWrite != nil {
 		logger.Zap.Error("failed attempt WRITE response")
 		return
 	}
@@ -269,32 +274,6 @@ func (hq *HandleQueries) UpdateSong(w http.ResponseWriter, r *http.Request) {
 
 	if _, errWrite := w.Write([]byte(`{}`)); errWrite != nil {
 		//logerr.ErrEvent("failed attempt WRITE response", errWrite)
-		return
-	}
-}
-
-// =========================================================================
-
-func (hq *HandleQueries) GetAll(w http.ResponseWriter, r *http.Request) {
-	res, errUpdate := hq.ListAll(r.Context())
-	if errUpdate != nil {
-		ErrReturn(fmt.Errorf("can't update task scheduler: %w", errUpdate), 404, w)
-		return
-	}
-
-	ans, errJSON := json.Marshal(res)
-	if errJSON != nil {
-		logger.Zap.Error(fmt.Errorf("failed attempt json-marshal response: %w", errJSON))
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-
-	w.WriteHeader(http.StatusOK)
-
-	if _, errWrite := w.Write([]byte(ans)); errWrite != nil {
-		logger.Zap.Error("failed attempt WRITE response")
 		return
 	}
 }

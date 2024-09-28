@@ -93,17 +93,25 @@ func (q *Queries) GetOne(ctx context.Context, id int32) (Library, error) {
 }
 
 const getText = `-- name: GetText :one
-SELECT text
+SELECT "group",
+    song,
+    text
 FROM library
 WHERE id = $1
 LIMIT 1
 `
 
-func (q *Queries) GetText(ctx context.Context, id int32) (string, error) {
+type GetTextRow struct {
+	Group string `json:"group"`
+	Song  string `json:"song"`
+	Text  string `json:"text"`
+}
+
+func (q *Queries) GetText(ctx context.Context, id int32) (GetTextRow, error) {
 	row := q.db.QueryRowContext(ctx, getText, id)
-	var text string
-	err := row.Scan(&text)
-	return text, err
+	var i GetTextRow
+	err := row.Scan(&i.Group, &i.Song, &i.Text)
+	return i, err
 }
 
 const listAll = `-- name: ListAll :many
