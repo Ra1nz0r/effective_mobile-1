@@ -16,10 +16,9 @@ import (
 )
 
 // FetchSongDetails делает запрос во внешний API и возвращает полученные сведения.
-// Формат запроса: http://localhost:7777/info?group='group name'&song='song name'.
-// Возвращает ошибку в случае неудачи.
-func FetchSongDetails(group, song, externalApiURL string) (*models.SongDetail, error) {
-	fullURL := fmt.Sprintf("%s?group=%s&song=%s", externalApiURL, url.PathEscape(group), url.PathEscape(song))
+// Формат запроса: http://localhost:7777/info?group=nGroup&song=nSong .
+func FetchSongDetails(nGroup, nSong, externalApiURL string) (*models.SongDetail, error) {
+	fullURL := fmt.Sprintf("%s?group=%s&song=%s", externalApiURL, url.PathEscape(nGroup), url.PathEscape(nSong))
 
 	resp, errResp := http.Get(fullURL)
 	if errResp != nil {
@@ -33,12 +32,12 @@ func FetchSongDetails(group, song, externalApiURL string) (*models.SongDetail, e
 
 	body, errBody := io.ReadAll(resp.Body)
 	if errBody != nil {
-		return nil, fmt.Errorf("%w", errBody)
+		return nil, errBody
 	}
 
 	var songDetail models.SongDetail
 	if errJson := json.Unmarshal(body, &songDetail); errJson != nil {
-		return nil, fmt.Errorf("%w", errJson)
+		return nil, errJson
 	}
 
 	return &songDetail, nil

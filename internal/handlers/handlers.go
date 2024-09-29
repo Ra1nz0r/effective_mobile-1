@@ -28,35 +28,53 @@ func NewHandlerQueries(connect *sql.DB, cfg cfg.Config) *HandleQueries {
 	}
 }
 
+// AddSongInLibrary добавляет песню в библиотеку. Обрабатывает POST запрос в формате
+// JSON {"group": "Muse", "song": "Supermassive Black Hole"}, полученные данные добавляются
+// в базу данных. Далее делается GET запрос во внешнее API для получения дополнительной
+// информации о добавленной песне. Если данные не найдены или сервер недоступен, то дополнительные
+// поля песни не заполняются и работа завершается. В случае успеха, делается запрос в базу данных
+// для добавления дополнительных сведений о песне.
 func (hq *HandleQueries) AddSongInLibrary(w http.ResponseWriter, r *http.Request) {
 	// Получаем group и song из запроса, и помещаем данные в структуру.
 	var baseParam db.AddParams
 	if err := json.NewDecoder(r.Body).Decode(&baseParam); err != nil {
-		http.Error(w, "Invalid request", http.StatusBadRequest)
+		logger.Zap.Error(err)
+		ErrReturn(fmt.Errorf("invalid request"), http.StatusBadRequest, w)
 		return
 	}
 
 	// Добавляем group и song в базу данных, без дополнительной информации.
-	insert, errCreate := hq.Add(r.Context(), baseParam)
-	if errCreate != nil {
-		//logerr.ErrEvent("cannot create task in DB", errCreate)
+	insert, err := hq.Add(r.Context(), baseParam)
+	if err != nil {
+		logger.Zap.Error(fmt.Errorf("error adding song: %w", err))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
 	// Делаем запрос во внешний API для получения дополнительной информации о песне.
-	details, errDetail := services.FetchSongDetails(baseParam.Group, baseParam.Song, hq.ExternalApiURL)
-	if errDetail != nil {
-		logger.Zap.Error(errDetail)
-		http.Error(
-			w,
+	// Если запрос завершился неудачей, то песня добавляется без дополнительных данных.
+	details, errDet := services.FetchSongDetails(baseParam.Group, baseParam.Song, hq.ExternalApiURL)
+	if errDet != nil {
+		logger.Zap.Error(errDet)
+
+		res := fmt.Sprintf(
 			`
+			Song ID: %d
 			Unable to get additional information about the song.
             There is no data or the server is unavailable.
 			The song will be added to the database without additional information.
 			`,
-			http.StatusInternalServerError,
+			insert.ID,
 		)
+
+		w.Header().Set("Content-Type", "text/plain; charset=UTF-8")
+
+		w.WriteHeader(http.StatusCreated)
+
+		if _, err = w.Write([]byte(res)); err != nil {
+			logger.Zap.Error(fmt.Errorf("failed attempt WRITE response: %w", err))
+			return
+		}
 		return
 	}
 
@@ -67,25 +85,28 @@ func (hq *HandleQueries) AddSongInLibrary(w http.ResponseWriter, r *http.Request
 		Link: details.Link,
 	}
 
-	// Приводим дату к нужному формату и обновляем дату в FetchParams.
-	var errParse error
-	fetch.ReleaseDate, errParse = time.Parse("02.01.2006", details.ReleaseDate)
-	if errParse != nil {
-		logger.Zap.Error("Error parsing date: %w", errParse)
-	}
-
-	// Делаем update песни в базе данных, заполняя поля releaseDate, text, link
-	if errFetch := hq.Fetch(r.Context(), fetch); errFetch != nil {
-		http.Error(w, "Error updating song", http.StatusInternalServerError)
+	// Приводим дату к нужному формату и обновляем в FetchParams.
+	fetch.ReleaseDate, err = time.Parse("02.01.2006", details.ReleaseDate)
+	if err != nil {
+		logger.Zap.Error(fmt.Errorf("error parsing date: %w", err))
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	// Создание мапы и выведение последнего ID добавленного в датабазу, ответ в виде: {"id":"186"}.
-	respResult := make(map[string]int32)
-	respResult["id"] = insert.ID
-	jsonResp, errJSON := json.Marshal(respResult)
+	// Делаем update песни в базе данных, заполняя поля releaseDate, text, link
+	if err = hq.Fetch(r.Context(), fetch); err != nil {
+		logger.Zap.Error(fmt.Errorf("error updating song: %w", err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	result := map[string]int32{
+		"id": insert.ID,
+	}
+
+	resJSON, errJSON := json.Marshal(result)
 	if errJSON != nil {
-		//logerr.ErrEvent("failed attempt json-marshal response", errJSON)
+		logger.Zap.Error(fmt.Errorf("failed attempt json-marshal response: %w", err))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -94,30 +115,32 @@ func (hq *HandleQueries) AddSongInLibrary(w http.ResponseWriter, r *http.Request
 
 	w.WriteHeader(http.StatusCreated)
 
-	if _, errWrite := w.Write(jsonResp); errWrite != nil {
-		//logerr.ErrEvent("failed attempt WRITE response", errWrite)
+	if _, err = w.Write(resJSON); err != nil {
+		logger.Zap.Error(fmt.Errorf("failed attempt WRITE response: %w", err))
 		return
 	}
 }
 
+// DeleteSong обрабатывает DELETE запрос и удаляет песню из библиотеки по указанному ID: "?id=21".
 func (hq *HandleQueries) DeleteSong(w http.ResponseWriter, r *http.Request) {
-	id, errID := strconv.Atoi(r.URL.Query().Get("id"))
-	if errID != nil || id < 1 {
-		logger.Zap.Error(fmt.Errorf("invalid string to number conversion or ID number: DeleteSong"))
+	id, err := strconv.Atoi(r.URL.Query().Get("id"))
+	if err != nil || id < 1 {
+		logger.Zap.Error("invalid string to number conversion or ID number")
 		ErrReturn(fmt.Errorf("invalid string to number conversion or ID number"), http.StatusBadRequest, w)
 		return
 	}
 
-	// Проверям существование задачи и возвращаем ошибку, если её нет в базе данных.
-	_, errGeted := hq.GetOne(r.Context(), int32(id))
-	if errGeted != nil {
-		ErrReturn(fmt.Errorf("the ID you entered does not exist: %w", errGeted), http.StatusBadRequest, w)
+	// Проверям существование песни и возвращаем ошибку, если её нет в базе данных.
+	if _, err = hq.GetOne(r.Context(), int32(id)); err != nil {
+		logger.Zap.Error("ID does not exist")
+		ErrReturn(fmt.Errorf("ID does not exist"), http.StatusBadRequest, w)
 		return
 	}
 
-	// Удаляем задачу из базы данных, при DELETE запросе в виде "/api/task?id=185".
-	if errDel := hq.Delete(r.Context(), int32(id)); errDel != nil {
-		//ErrReturn(fmt.Errorf("failed delete: %w", errDel), w)
+	// Удаляем задачу из базы данных.
+	if err = hq.Delete(r.Context(), int32(id)); err != nil {
+		logger.Zap.Error("Delete request failed.")
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
@@ -125,25 +148,24 @@ func (hq *HandleQueries) DeleteSong(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 
-	if _, errWrite := w.Write([]byte(`{}`)); errWrite != nil {
-		//logerr.ErrEvent("failed attempt WRITE response", errWrite)
+	if _, err = w.Write([]byte(`{}`)); err != nil {
+		logger.Zap.Error(fmt.Errorf("failed attempt WRITE response: %w", err))
 		return
 	}
 }
 
-// Собирает все метрики метрики из локального хранилища и выводит их в
-// результирующей карте при получении GET запроса.
-// Вызывает метод интерфейса, который возвращает копию локального хранилища.
-// Формат JSON, в виде {"Alloc":146464,"Frees":10,...}.
-func (hq *HandleQueries) ListAllSongsWithFilters(w http.ResponseWriter, r *http.Request) {
+// ListAllSongsWithFilters обрабатывает GET запрос, получает данные из базы данных и
+// выводит весь список песен из библиотеки в соответствии с фильтрами.
+// Формат запроса "?group=Pink Floyd&releaseDate=11.11.2022&limit5&offset=0".
+func (hq *HandleQueries) ListSongsWithFilters(w http.ResponseWriter, r *http.Request) {
 	// Чтение параметров запроса из URL.
 	group := r.URL.Query().Get("group")
 	song := r.URL.Query().Get("song")
 	releaseDate := r.URL.Query().Get("releaseDate")
 	text := r.URL.Query().Get("text")
 
-	limit, errLimit := strconv.Atoi(r.URL.Query().Get("limit"))
-	if errLimit != nil || limit <= 0 {
+	limit, err := strconv.Atoi(r.URL.Query().Get("limit"))
+	if err != nil || limit <= 0 {
 		limit = hq.PaginationLimit
 	}
 
@@ -152,6 +174,7 @@ func (hq *HandleQueries) ListAllSongsWithFilters(w http.ResponseWriter, r *http.
 		offset = 0
 	}
 
+	// Если полученные параметры не пусты, то записываем их в структуру запроса к базе данных.
 	params := db.ListWithFiltersParams{
 		Column1: sql.NullString{String: group, Valid: group != ""},
 		Column2: sql.NullString{String: song, Valid: song != ""},
@@ -160,19 +183,20 @@ func (hq *HandleQueries) ListAllSongsWithFilters(w http.ResponseWriter, r *http.
 		Offset:  int32(offset),
 	}
 
-	var errParse error
 	if releaseDate != "" {
-		// Приводим дату к нужному формату и обновляем дату в FetchParams.
-		params.ReleaseDate, errParse = time.Parse("02.01.2006", releaseDate)
-		if errParse != nil {
-			logger.Zap.Error("Error parsing date: %w", errParse)
+		params.ReleaseDate, err = time.Parse("02.01.2006", releaseDate)
+		if err != nil {
+			logger.Zap.Error(fmt.Errorf("error parsing date: %w", err))
+			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 	}
 
+	// Делаем запрос в базу данных с учётом указанных параметров фильтра.
 	res, errUpdate := hq.ListWithFilters(r.Context(), params)
 	if errUpdate != nil {
-		ErrReturn(fmt.Errorf("can't update task scheduler: %w", errUpdate), http.StatusBadRequest, w)
+		logger.Zap.Error("Request could not be processed based on the specified filters.")
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
@@ -193,60 +217,70 @@ func (hq *HandleQueries) ListAllSongsWithFilters(w http.ResponseWriter, r *http.
 	}
 }
 
-// songs/verse?id=1&page=1
+// TextSongWithPagination обрабатывает GET запрос и выводит текст песни по указанному ID,
+// разбитый на куплеты по страницам. Текст разделяется на куплеты по символу "\n\n".
+// Формат запроса: "?id=16&page=1".
 func (hq *HandleQueries) TextSongWithPagination(w http.ResponseWriter, r *http.Request) {
-	songID, errID := strconv.Atoi(r.URL.Query().Get("id"))
-	if errID != nil || songID < 1 {
-		http.Error(w, "Invalid song id", http.StatusBadRequest)
+	songID, err := strconv.Atoi(r.URL.Query().Get("id"))
+	if err != nil || songID < 1 {
+		logger.Zap.Error("invalid string to number conversion or ID number")
+		ErrReturn(fmt.Errorf("invalid string to number conversion or ID number"), http.StatusBadRequest, w)
 		return
 	}
 
-	pageStr := r.URL.Query().Get("page")
-	page, errPage := strconv.Atoi(pageStr)
+	page, errPage := strconv.Atoi(r.URL.Query().Get("page"))
 	if errPage != nil {
-		http.Error(w, "Invalid page", http.StatusBadRequest)
+		logger.Zap.Error("invalid string to number conversion or PAGE number")
+		ErrReturn(fmt.Errorf("invalid string to number conversion or PAGE number"), http.StatusBadRequest, w)
 		return
 	}
 
-	// Получаем текст песни из базы данных
+	// Получаем данные песни из базы данных.
 	song, errSG := hq.GetText(r.Context(), int32(songID))
 	if errSG != nil {
-		http.Error(w, "Error fetching song text", http.StatusInternalServerError)
+		logger.Zap.Error("Unable to retrieve song data.")
+		ErrReturn(fmt.Errorf("invalid ID number"), http.StatusInternalServerError, w)
 		return
 	}
 
-	// Разбиваем текст на куплеты по символу "\n\n"
-	verses := strings.Split(song.Text, "\n\n")
+	// Разбиваем текст на куплеты по символу '\n\n'.
+	couplet := strings.Split(song.Text, "\n\n")
 
-	// Проверяем, не выходит ли запрашиваемая страница за пределы
-	if page > len(verses) || page < 1 {
-		http.Error(w, "Page out of range", http.StatusNotFound)
+	// Проверяем, не выходит ли запрашиваемая страница за пределы.
+	if page > len(couplet) || page < 1 {
+		logger.Zap.Error("Page out of range")
+		ErrReturn(fmt.Errorf("page out of range"), http.StatusBadRequest, w)
 		return
 	}
 
-	verse := strings.ReplaceAll(verses[page-1], "\n", "\n")
+	// Заменяем все символы '\n' в куплетах для корректного вывода.
+	verse := strings.ReplaceAll(couplet[page-1], "\n", "\n")
+
+	// Конфигурируем выходной результат.
+	result := fmt.Sprintf("Group: %s, Song: %s\n\n%s", song.Group, song.Song, verse)
 
 	w.Header().Set("Content-Type", "text/plain; charset=UTF-8")
 
 	w.WriteHeader(http.StatusOK)
 
-	result := fmt.Sprintf("Group: %s, Song: %s\n\n%s", song.Group, song.Song, verse)
-
-	if _, errWrite := w.Write([]byte(result)); errWrite != nil {
+	if _, err = w.Write([]byte(result)); err != nil {
 		logger.Zap.Error("failed attempt WRITE response")
 		return
 	}
 }
 
+// UpdateSong обрабатывает PUT запрос в формате JSON и обновляет параметры песни в базе данных.
+// Формат запроса: {"id": 3, "releaseDate": "11.04.2022", "text": "You set my soul alight", "link": "ops link"}.
 func (hq *HandleQueries) UpdateSong(w http.ResponseWriter, r *http.Request) {
 	// Обрабатываем полученные данные из JSON и записываем в структуру.
 	var sd models.SongDetail
 	if err := json.NewDecoder(r.Body).Decode(&sd); err != nil {
-		http.Error(w, "Invalid request", http.StatusBadRequest)
+		logger.Zap.Error(err)
+		ErrReturn(fmt.Errorf("invalid request"), http.StatusBadRequest, w)
 		return
 	}
 
-	// Обновляем параметры песни в соответствии с полученными данными.
+	// Заполняем данные для запроса в базу данных в соответствии с полученными данными.
 	upd := db.UpdateParams{
 		ID:   sd.ID,
 		Text: sd.Text,
@@ -262,7 +296,7 @@ func (hq *HandleQueries) UpdateSong(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Делаем запрос и обновляем параметры песни в базе данных, в соответствии с полученными.
+	// Делаем запрос и обновляем releaseDate, text, link песни в базе данных, в соответствии с полученными.
 	if errUpdate := hq.Update(r.Context(), upd); errUpdate != nil {
 		ErrReturn(fmt.Errorf("can't update task scheduler: %w", errUpdate), http.StatusBadRequest, w)
 		return
@@ -270,15 +304,15 @@ func (hq *HandleQueries) UpdateSong(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
-	w.WriteHeader(http.StatusAccepted)
+	w.WriteHeader(http.StatusOK)
 
 	if _, errWrite := w.Write([]byte(`{}`)); errWrite != nil {
-		//logerr.ErrEvent("failed attempt WRITE response", errWrite)
+		logger.Zap.Error("failed attempt WRITE response")
 		return
 	}
 }
 
-// WithRequestDetails добавляет дополнительный код для регистрации сведений о запросе.
+// WithRequestDetails (middleware) добавляет дополнительный код для регистрации сведений о запросе.
 func (hs *HandleQueries) WithRequestDetails(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
@@ -286,17 +320,16 @@ func (hs *HandleQueries) WithRequestDetails(h http.Handler) http.Handler {
 		h.ServeHTTP(w, r)
 
 		logger.Zap.Info(
-			"URI:", r.RequestURI,
 			"Method:", r.Method,
 			"Duration:", time.Since(start),
+			"URI:", r.RequestURI,
 		)
 	})
 }
 
-// WithResponseDetails добавляет дополнительный код для регистрации сведений об ответе.
+// WithResponseDetails (middleware) добавляет дополнительный код для регистрации сведений об ответе.
 func (hs *HandleQueries) WithResponseDetails(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		start := time.Now()
 		lw := logginResponseWriter{
 			ResponseWriter: w,
 			status:         0,
@@ -306,14 +339,13 @@ func (hs *HandleQueries) WithResponseDetails(h http.Handler) http.Handler {
 		h.ServeHTTP(&lw, r)
 
 		logger.Zap.Info(
-			"URI:", r.RequestURI,
 			"Status:", lw.status,
 			"Size:", lw.size,
-			"Duration:", time.Since(start),
 		)
 	})
 }
 
+// Переопределение методов для выведения дополнительной информации о запросах и ответах.
 type logginResponseWriter struct {
 	http.ResponseWriter
 	status int

@@ -3,17 +3,17 @@ package config
 import "github.com/spf13/viper"
 
 type Config struct {
-	ServerHost       string `mapstructure:"ADDRESS"`
-	LogLevel         string `mapstructure:"LOG_LEVEL"`
-	MigrationPath    string `mapstructure:"MIGRATION_PATH"`
-	ExternalApiURL   string `mapstructure:"EXTERNAL_API_URL"`
-	PaginationLimit  int    `mapstructure:"PAGINATION_LIMIT"`
-	DatabaseUser     string `mapstructure:"DB_USER"`
-	DatabasePassword string `mapstructure:"DB_PASSWORD"`
-	DatabaseHost     string `mapstructure:"DB_HOST"`
-	DatabasePort     string `mapstructure:"DB_PORT"`
-	DatabaseName     string `mapstructure:"DB_NAME"`
-	DatabaseDriver   string `mapstructure:"DB_DRIVER"`
+	ServerHost       string `mapstructure:"ADDRESS"`          // адрес сервера
+	LogLevel         string `mapstructure:"LOG_LEVEL"`        // уровень логирования
+	MigrationPath    string `mapstructure:"MIGRATION_PATH"`   // путь до папки с миграциями
+	ExternalApiURL   string `mapstructure:"EXTERNAL_API_URL"` // адрес до внешнего API
+	PaginationLimit  int    `mapstructure:"PAGINATION_LIMIT"` // размер пагинации по-умолчанию
+	DatabaseUser     string `mapstructure:"DB_USER"`          // имя пользователя датабазы
+	DatabasePassword string `mapstructure:"DB_PASSWORD"`      // пароль пользователя датабазы
+	DatabaseHost     string `mapstructure:"DB_HOST"`          // адрес для подключения к датабазе
+	DatabasePort     string `mapstructure:"DB_PORT"`          // порт для подключения к датабазе
+	DatabaseName     string `mapstructure:"DB_NAME"`          // имя датабазы
+	DatabaseDriver   string `mapstructure:"DB_DRIVER"`        // драйвер датабазы
 }
 
 // LoadConfig загружает из файла '.env' переменные окружения.
