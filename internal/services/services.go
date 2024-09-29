@@ -66,7 +66,8 @@ func TableExists(db *sql.DB, tableName string) (bool, error) {
 	query := fmt.Sprintf(`
 		SELECT EXISTS (
 			SELECT FROM pg_tables
-			WHERE schemaname = 'public' AND tablename = '%s'
+			WHERE schemaname = 'public' OR schemaname = 'private'
+			AND tablename = '%s'
 		);`, tableName)
 	err := db.QueryRow(query).Scan(&exists)
 	if err != nil {
