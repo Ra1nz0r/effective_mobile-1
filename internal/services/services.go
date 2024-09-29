@@ -9,14 +9,14 @@ import (
 	"net/url"
 
 	"github.com/Ra1nz0r/effective_mobile-1/internal/models"
-
 	"github.com/golang-migrate/migrate/v4"
+
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
 // FetchSongDetails делает запрос во внешний API и возвращает полученные сведения.
-// Формат запроса: http://localhost:7777/info?group=nGroup&song=nSong .
+// Формат запроса: http://localhost:7777/info?group=nGroup&song=nSong.
 func FetchSongDetails(nGroup, nSong, externalApiURL string) (*models.SongDetail, error) {
 	fullURL := fmt.Sprintf("%s?group=%s&song=%s", externalApiURL, url.PathEscape(nGroup), url.PathEscape(nSong))
 

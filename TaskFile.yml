@@ -52,3 +52,8 @@ tasks:
     desc: "Run docker with changing all default params."
     cmds:
       -  sqlc generate
+
+  swag: # название задачи для запуска
+    desc: "Run docker with changing all default params."
+    cmds:
+      -  swag init -q -g ./cmd/app/main.go

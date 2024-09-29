@@ -17,6 +17,7 @@ import (
 	"github.com/Ra1nz0r/effective_mobile-1/internal/logger"
 	srv "github.com/Ra1nz0r/effective_mobile-1/internal/services"
 	"github.com/go-chi/chi/v5"
+	httpSwagger "github.com/swaggo/http-swagger"
 
 	_ "github.com/jackc/pgx/v4/stdlib"
 )
@@ -72,6 +73,10 @@ func Run() {
 
 	// Создаём router и endpoints.
 	r := chi.NewRouter()
+
+	r.Get("/swagger/*", httpSwagger.Handler(
+		httpSwagger.URL("doc.json"),
+	))
 
 	r.Group(func(r chi.Router) { // исправить эндпойнты на другие
 		r.Use(queries.WithRequestDetails)

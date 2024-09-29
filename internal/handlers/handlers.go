@@ -34,6 +34,18 @@ func NewHandlerQueries(connect *sql.DB, cfg cfg.Config) *HandleQueries {
 // информации о добавленной песне. Если данные не найдены или сервер недоступен, то дополнительные
 // поля песни не заполняются и работа завершается. В случае успеха, делается запрос в базу данных
 // для добавления дополнительных сведений о песне.
+//
+// @Summary Добавляет песню в онлайн библиотеку.
+// @Description Добавляет песню в базу данных и делает запрос во внешнее API для получения дополнительных сведений. Если внешнее API недоступно, песня добавляется без дополнительных данных.
+// @Tags library
+// @Accept  json
+// @Produce plain,json
+// @Param db.AddParams body db.AddParams true "Данные из запроса для добавления песни."
+// @Success 200 {string} string "Успешное добавление песни без дополнительных данных."
+// @Success 201 {object} map[string]int32 "Успешное добавление песни с полными данными."
+// @Failure 400 {object} map[string]string "Некорректный запрос."
+// @Failure 500 {string} string "Ошибка сервера при добавлении или обновлении песни."
+// @Router /library/add [post]
 func (hq *HandleQueries) AddSongInLibrary(w http.ResponseWriter, r *http.Request) {
 	// Получаем group и song из запроса, и помещаем данные в структуру.
 	var baseParam db.AddParams
@@ -61,7 +73,7 @@ func (hq *HandleQueries) AddSongInLibrary(w http.ResponseWriter, r *http.Request
 			`
 			Song ID: %d
 			Unable to get additional information about the song.
-            There is no data or the server is unavailable.
+			There is no data or the server is unavailable.
 			The song will be added to the database without additional information.
 			`,
 			insert.ID,
@@ -69,7 +81,7 @@ func (hq *HandleQueries) AddSongInLibrary(w http.ResponseWriter, r *http.Request
 
 		w.Header().Set("Content-Type", "text/plain; charset=UTF-8")
 
-		w.WriteHeader(http.StatusCreated)
+		w.WriteHeader(http.StatusOK)
 
 		if _, err = w.Write([]byte(res)); err != nil {
 			logger.Zap.Error(fmt.Errorf("failed attempt WRITE response: %w", err))
@@ -122,6 +134,17 @@ func (hq *HandleQueries) AddSongInLibrary(w http.ResponseWriter, r *http.Request
 }
 
 // DeleteSong обрабатывает DELETE запрос и удаляет песню из библиотеки по указанному ID: "?id=21".
+//
+// @Summary Удаляет песню из онлайн библиотеки.
+// @Description Обрабатывает DELETE запрос и удаляет песню из библиотеки по указанному ID.
+// @Tags library
+// @Accept  plain
+// @Produce json
+// @Param id query string true "Необходимый ID для удаления песни."
+// @Success 200 {string} string "Успешное удаление песни."
+// @Failure 400 {object} map[string]string "Некорректный запрос."
+// @Failure 500 {string} string "Ошибка сервера при удалении песни."
+// @Router /library/delete [delete]
 func (hq *HandleQueries) DeleteSong(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.URL.Query().Get("id"))
 	if err != nil || id < 1 {
@@ -156,7 +179,23 @@ func (hq *HandleQueries) DeleteSong(w http.ResponseWriter, r *http.Request) {
 
 // ListAllSongsWithFilters обрабатывает GET запрос, получает данные из базы данных и
 // выводит весь список песен из библиотеки в соответствии с фильтрами.
-// Формат запроса "?group=Pink Floyd&releaseDate=11.11.2022&limit5&offset=0".
+// Формат запроса: "?group=Pink Floyd&releaseDate=11.11.2022&limit5&offset=0".
+//
+// @Summary Выводит весь список песен из библиотеки в соответствии с фильтрами.
+// @Description Получает данные из базы и выводит весь список песен из библиотеки в соответствии с фильтрами.
+// @Tags library
+// @Accept  plain
+// @Produce json
+// @Param group query string false "Имя группы для фильтрации."
+// @Param song query string false "Название композиции для фильтрации."
+// @Param releaseDate query string false "Дата релиза для фильтрации."
+// @Param text query string false "Слова в тексте песни для фильтрации"
+// @Param limit query string false "Лимит для создания пагинации, по-умолчанию 10."
+// @Param offset query string false "Смещение для создания пагинации, по-умолчанию 0."
+// @Success 200 {object} []db.Library "Успешный запрос с учётом фильтрации."
+// @Failure 400 {object} map[string]string "Некорректный запрос."
+// @Failure 500 {string} string "Ошибка сервера при создании фильтрации."
+// @Router /list [get]
 func (hq *HandleQueries) ListSongsWithFilters(w http.ResponseWriter, r *http.Request) {
 	// Чтение параметров запроса из URL.
 	group := r.URL.Query().Get("group")
@@ -186,8 +225,8 @@ func (hq *HandleQueries) ListSongsWithFilters(w http.ResponseWriter, r *http.Req
 	if releaseDate != "" {
 		params.ReleaseDate, err = time.Parse("02.01.2006", releaseDate)
 		if err != nil {
-			logger.Zap.Error(fmt.Errorf("error parsing date: %w", err))
-			w.WriteHeader(http.StatusBadRequest)
+			logger.Zap.Error("Error parsing date: %w", err)
+			ErrReturn(fmt.Errorf("incorrect date format, expected DD.MM.YYYY: %w", err), http.StatusBadRequest, w)
 			return
 		}
 	}
@@ -220,6 +259,17 @@ func (hq *HandleQueries) ListSongsWithFilters(w http.ResponseWriter, r *http.Req
 // TextSongWithPagination обрабатывает GET запрос и выводит текст песни по указанному ID,
 // разбитый на куплеты по страницам. Текст разделяется на куплеты по символу "\n\n".
 // Формат запроса: "?id=16&page=1".
+//
+// @Summary Текст песни по куплетам.
+// @Description Выводит текст по указанному ID, разбитый на куплеты по страницам.
+// @Tags library
+// @Accept  plain
+// @Produce plain
+// @Param id query string true "ID группы для поиска композиции."
+// @Param page query string true "Номер страницы для пагинации."
+// @Success 200 {string} string "Успешный запрос и разбивка на куплеты."
+// @Failure 400 {object} map[string]string "Некорректный запрос."
+// @Router /song/couplet [get]
 func (hq *HandleQueries) TextSongWithPagination(w http.ResponseWriter, r *http.Request) {
 	songID, err := strconv.Atoi(r.URL.Query().Get("id"))
 	if err != nil || songID < 1 {
@@ -239,7 +289,7 @@ func (hq *HandleQueries) TextSongWithPagination(w http.ResponseWriter, r *http.R
 	song, errSG := hq.GetText(r.Context(), int32(songID))
 	if errSG != nil {
 		logger.Zap.Error("Unable to retrieve song data.")
-		ErrReturn(fmt.Errorf("invalid ID number"), http.StatusInternalServerError, w)
+		ErrReturn(fmt.Errorf("invalid ID number"), http.StatusBadRequest, w)
 		return
 	}
 
@@ -271,6 +321,17 @@ func (hq *HandleQueries) TextSongWithPagination(w http.ResponseWriter, r *http.R
 
 // UpdateSong обрабатывает PUT запрос в формате JSON и обновляет параметры песни в базе данных.
 // Формат запроса: {"id": 3, "releaseDate": "11.04.2022", "text": "You set my soul alight", "link": "ops link"}.
+//
+// @Summary Обновляет параметры песни.
+// @Description По указанному ID обновляет releaseDate, text, link у песни.
+// @Tags library
+// @Accept  plain
+// @Produce plain
+// @Param models.SongDetail body models.SongDetail true "Данные для обновления."
+// @Success 200 {string} string "Успешный запрос и обновление параметров."
+// @Failure 400 {object} map[string]string "Некорректный запрос."
+// @Failure 500 {string} string "Ошибка сервера при обновлении параметров."
+// @Router /library/update [put]
 func (hq *HandleQueries) UpdateSong(w http.ResponseWriter, r *http.Request) {
 	// Обрабатываем полученные данные из JSON и записываем в структуру.
 	var sd models.SongDetail
@@ -292,7 +353,7 @@ func (hq *HandleQueries) UpdateSong(w http.ResponseWriter, r *http.Request) {
 	upd.ReleaseDate, errParse = time.Parse("02.01.2006", sd.ReleaseDate)
 	if errParse != nil {
 		logger.Zap.Error("Error parsing date: %w", errParse)
-		ErrReturn(fmt.Errorf("can't update task scheduler: %w", errParse), http.StatusBadRequest, w)
+		ErrReturn(fmt.Errorf("incorrect date format, expected DD.MM.YYYY: %w", errParse), http.StatusBadRequest, w)
 		return
 	}
 
