@@ -1,0 +1,38 @@
+---
+name: Linting.
+
+on:
+  workflow_dispatch:
+
+permissions: { }
+
+jobs:
+  lint:
+    name: Checking with Lint.
+    runs-on: ubuntu-latest
+       
+    permissions:
+      contents: read
+      packages: read
+      statuses: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+    
+      - name: Super-Linter
+        uses: super-linter/super-linter/slim@v7.1.0
+        with:
+          args: --timeout=10m --verbose
+        env:
+          VALIDATE_MARKDOWN: false
+          VALIDATE_SQLFLUFF: false
+          VALIDATE_JSCPD: false
+          VALIDATE_CSS: false
+          VALIDATE_HTML: false
+          VALIDATE_SHELL_SHFMT: false
+          VALIDATE_BASH_EXEC: false
+          VALIDATE_GO: false
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
