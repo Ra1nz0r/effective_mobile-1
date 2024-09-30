@@ -6,7 +6,7 @@ type Config struct {
 	ServerHost       string `mapstructure:"ADDRESS"`          // адрес сервера
 	LogLevel         string `mapstructure:"LOG_LEVEL"`        // уровень логирования
 	MigrationPath    string `mapstructure:"MIGRATION_PATH"`   // путь до папки с миграциями
-	ExternalApiURL   string `mapstructure:"EXTERNAL_API_URL"` // адрес до внешнего API
+	ExternalAPIURL   string `mapstructure:"EXTERNAL_API_URL"` // адрес до внешнего API
 	PaginationLimit  int    `mapstructure:"PAGINATION_LIMIT"` // размер пагинации по-умолчанию
 	DatabaseUser     string `mapstructure:"DB_USER"`          // имя пользователя датабазы
 	DatabasePassword string `mapstructure:"DB_PASSWORD"`      // пароль пользователя датабазы

@@ -2,8 +2,9 @@ package test
 
 import (
 	"errors"
-	"fmt"
 	"testing"
+
+	"fmt"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/Ra1nz0r/effective_mobile-1/internal/services"

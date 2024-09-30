@@ -3,11 +3,12 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+
+	"fmt"
 
 	db "github.com/Ra1nz0r/effective_mobile-1/db/sqlc"
 	cfg "github.com/Ra1nz0r/effective_mobile-1/internal/config"
@@ -65,7 +66,7 @@ func (hq *HandleQueries) AddSongInLibrary(w http.ResponseWriter, r *http.Request
 
 	// Делаем запрос во внешний API для получения дополнительной информации о песне.
 	// Если запрос завершился неудачей, то песня добавляется без дополнительных данных.
-	details, errDet := services.FetchSongDetails(baseParam.Group, baseParam.Song, hq.ExternalApiURL)
+	details, errDet := services.FetchSongDetails(baseParam.Group, baseParam.Song, hq.ExternalAPIURL)
 	if errDet != nil {
 		logger.Zap.Error(errDet)
 
@@ -246,7 +247,7 @@ func (hq *HandleQueries) ListSongsWithFilters(w http.ResponseWriter, r *http.Req
 
 	w.WriteHeader(http.StatusOK)
 
-	if _, errWrite := w.Write([]byte(ans)); errWrite != nil {
+	if _, errWrite := w.Write(ans); errWrite != nil {
 		logger.Zap.Error("failed attempt WRITE response")
 		return
 	}
@@ -370,7 +371,7 @@ func (hq *HandleQueries) UpdateSong(w http.ResponseWriter, r *http.Request) {
 }
 
 // WithRequestDetails (middleware) добавляет дополнительный код для регистрации сведений о запросе.
-func (hs *HandleQueries) WithRequestDetails(h http.Handler) http.Handler {
+func (hq *HandleQueries) WithRequestDetails(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 
@@ -385,7 +386,7 @@ func (hs *HandleQueries) WithRequestDetails(h http.Handler) http.Handler {
 }
 
 // WithResponseDetails (middleware) добавляет дополнительный код для регистрации сведений об ответе.
-func (hs *HandleQueries) WithResponseDetails(h http.Handler) http.Handler {
+func (hq *HandleQueries) WithResponseDetails(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		lw := logginResponseWriter{
 			ResponseWriter: w,

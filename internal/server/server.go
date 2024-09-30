@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -12,14 +11,14 @@ import (
 	"syscall"
 	"time"
 
+	"fmt"
+
 	"github.com/Ra1nz0r/effective_mobile-1/internal/config"
 	hd "github.com/Ra1nz0r/effective_mobile-1/internal/handlers"
 	"github.com/Ra1nz0r/effective_mobile-1/internal/logger"
 	srv "github.com/Ra1nz0r/effective_mobile-1/internal/services"
 	"github.com/go-chi/chi/v5"
 	httpSwagger "github.com/swaggo/http-swagger"
-
-	_ "github.com/jackc/pgx/v4/stdlib"
 )
 
 // Run запускает сервер.

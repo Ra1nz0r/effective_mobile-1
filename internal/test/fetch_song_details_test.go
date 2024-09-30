@@ -9,6 +9,7 @@ import (
 	"github.com/Ra1nz0r/effective_mobile-1/internal/models"
 	"github.com/Ra1nz0r/effective_mobile-1/internal/services"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // MockSongDetail это структура для тестирования
@@ -27,7 +28,8 @@ func TestFetchSongDetails_Success(t *testing.T) {
 
 		// Возвращаем успешный JSON-ответ
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(MockSongDetail)
+		err := json.NewEncoder(w).Encode(MockSongDetail)
+		require.NoError(t, err)
 	}))
 	defer mockServer.Close()
 
@@ -42,7 +44,7 @@ func TestFetchSongDetails_Success(t *testing.T) {
 
 func TestFetchSongDetails_HttpError(t *testing.T) {
 	// Закрываем HTTP-сервер для имитации ошибки сети.
-	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	mockServer := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {}))
 	mockServer.Close()
 
 	// Вызываем тестируемую функцию
@@ -54,7 +56,7 @@ func TestFetchSongDetails_HttpError(t *testing.T) {
 
 func TestFetchSongDetails_StatusNotOK(t *testing.T) {
 	// Создаем тестовый HTTP-сервер, который возвращает статус 500.
-	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
 	defer mockServer.Close()
@@ -85,9 +87,10 @@ func TestFetchSongDetails_BodyReadError(t *testing.T) {
 
 func TestFetchSongDetails_JSONUnmarshalError(t *testing.T) {
 	// Создаем тестовый HTTP-сервер, который возвращает некорректный JSON.
-	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("invalid json"))
+		_, err := w.Write([]byte("invalid json"))
+		require.NoError(t, err)
 	}))
 	defer mockServer.Close()
 

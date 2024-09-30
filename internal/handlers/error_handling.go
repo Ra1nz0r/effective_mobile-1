@@ -2,8 +2,9 @@ package handlers
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
+
+	"fmt"
 
 	"github.com/Ra1nz0r/effective_mobile-1/internal/logger"
 )

@@ -3,22 +3,20 @@ package services
 import (
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 
+	"fmt"
+
 	"github.com/Ra1nz0r/effective_mobile-1/internal/models"
 	"github.com/golang-migrate/migrate/v4"
-
-	_ "github.com/golang-migrate/migrate/v4/database/postgres"
-	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
 // FetchSongDetails делает запрос во внешний API и возвращает полученные сведения.
 // Формат запроса: http://localhost:7777/info?group=nGroup&song=nSong.
-func FetchSongDetails(nGroup, nSong, externalApiURL string) (*models.SongDetail, error) {
-	fullURL := fmt.Sprintf("%s?group=%s&song=%s", externalApiURL, url.PathEscape(nGroup), url.PathEscape(nSong))
+func FetchSongDetails(nGroup, nSong, externalAPIURL string) (*models.SongDetail, error) {
+	fullURL := fmt.Sprintf("%s?group=%s&song=%s", externalAPIURL, url.PathEscape(nGroup), url.PathEscape(nSong))
 
 	resp, errResp := http.Get(fullURL)
 	if errResp != nil {
@@ -36,8 +34,8 @@ func FetchSongDetails(nGroup, nSong, externalApiURL string) (*models.SongDetail,
 	}
 
 	var songDetail models.SongDetail
-	if errJson := json.Unmarshal(body, &songDetail); errJson != nil {
-		return nil, errJson
+	if errJSON := json.Unmarshal(body, &songDetail); errJSON != nil {
+		return nil, errJSON
 	}
 
 	return &songDetail, nil

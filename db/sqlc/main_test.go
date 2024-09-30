@@ -2,10 +2,11 @@ package db
 
 import (
 	"database/sql"
-	"fmt"
 	"log"
 	"os"
 	"testing"
+
+	"fmt"
 
 	"github.com/Ra1nz0r/effective_mobile-1/internal/config"
 	"github.com/Ra1nz0r/effective_mobile-1/internal/logger"

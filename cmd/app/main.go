@@ -3,6 +3,9 @@ package main
 import (
 	_ "github.com/Ra1nz0r/effective_mobile-1/docs"
 	"github.com/Ra1nz0r/effective_mobile-1/internal/server"
+	_ "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
+	_ "github.com/jackc/pgx/v4/stdlib"
 )
 
 // @title Music Library

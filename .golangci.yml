@@ -1,0 +1,26 @@
+---
+linters:
+  enable:
+    - gosimple
+    - unused
+    - errname
+    - gosec
+    - unconvert
+    - gofmt
+    - gocyclo
+    - goconst
+    - goimports
+    - gocritic
+    - govet
+    - revive
+linters-settings:
+  errcheck:
+    # report about assignment of errors to blank identifier: `num, _ := strconv.Atoi(numStr)`;
+    # default is false: such cases aren't reported by default.
+    check-blank: true
+  govet:
+    # report about shadowed variables
+    linters.govet.check-shadowing: true
+  gocyclo:
+    # minimal code complexity to report, 30 by default
+    min-complexity: 20
