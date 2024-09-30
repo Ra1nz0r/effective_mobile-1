@@ -14,8 +14,8 @@ func TestQuery(t *testing.T) {
 	tDate := Library{
 		Group:       "Nirvana",
 		Song:        "Lithium",
-		ReleaseDate: time.Date(1111, 11, 11, 0, 0, 0, 0, time.UTC),
-		Text:        "Lalalala",
+		ReleaseDate: time.Date(1999, 5, 11, 0, 0, 0, 0, time.UTC),
+		Text:        "Angie, Angie, when will those dark clouds disappear",
 		Link:        "http://www.ops.com",
 	}
 
@@ -65,7 +65,7 @@ func TestQuery(t *testing.T) {
 	// Настраиваем фильтры и делаем запрос в базу данных для вывода песен с их учётом.
 	listFilter := ListWithFiltersParams{
 		Column1: sql.NullString{String: tDate.Group, Valid: true},
-		Column4: sql.NullString{String: "la", Valid: true},
+		Column4: sql.NullString{String: "will", Valid: true},
 		Limit:   10,
 		Offset:  0,
 	}
@@ -78,7 +78,7 @@ func TestQuery(t *testing.T) {
 	// Обновляем параметры песни.
 	updParam := UpdateParams{
 		ID:          res.ID,
-		ReleaseDate: time.Date(2222, 4, 8, 0, 0, 0, 0, time.UTC),
+		ReleaseDate: time.Date(2004, 4, 8, 0, 0, 0, 0, time.UTC),
 	}
 
 	err = testQueries.Update(ctx, updParam)

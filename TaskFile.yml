@@ -5,7 +5,7 @@ tasks:
   run: # название задачи для запуска
     desc: "Runs all '.go' files."
     cmds:
-      - go run ./...
+      - go run ./cmd/app
 
   run_s: # название задачи для запуска
     desc: "Runs all '.go' files."
