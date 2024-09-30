@@ -47,20 +47,21 @@ paths:
   /library/add:
     post:
       consumes:
-      - application/json
-      description: Добавляет песню в базу данных и делает запрос во внешнее API для
+        - application/json
+      description:
+        Добавляет песню в базу данных и делает запрос во внешнее API для
         получения дополнительных сведений. Если внешнее API недоступно, песня добавляется
         без дополнительных данных.
       parameters:
-      - description: Данные из запроса для добавления песни.
-        in: body
-        name: db.AddParams
-        required: true
-        schema:
-          $ref: '#/definitions/db.AddParams'
+        - description: Данные из запроса для добавления песни.
+          in: body
+          name: db.AddParams
+          required: true
+          schema:
+            $ref: "#/definitions/db.AddParams"
       produces:
-      - text/plain
-      - application/json
+        - text/plain
+        - application/json
       responses:
         "200":
           description: Успешное добавление песни без дополнительных данных.
@@ -84,21 +85,22 @@ paths:
             type: string
       summary: Добавляет песню в онлайн библиотеку.
       tags:
-      - library
+        - library
   /library/delete:
     delete:
       consumes:
-      - text/plain
-      description: Обрабатывает DELETE запрос и удаляет песню из библиотеки по указанному
+        - text/plain
+      description:
+        Обрабатывает DELETE запрос и удаляет песню из библиотеки по указанному
         ID.
       parameters:
-      - description: Необходимый ID для удаления песни.
-        in: query
-        name: id
-        required: true
-        type: string
+        - description: Необходимый ID для удаления песни.
+          in: query
+          name: id
+          required: true
+          type: string
       produces:
-      - application/json
+        - application/json
       responses:
         "200":
           description: Успешное удаление песни.
@@ -116,21 +118,21 @@ paths:
             type: string
       summary: Удаляет песню из онлайн библиотеки.
       tags:
-      - library
+        - library
   /library/update:
     put:
       consumes:
-      - text/plain
+        - text/plain
       description: По указанному ID обновляет releaseDate, text, link у песни.
       parameters:
-      - description: Данные для обновления.
-        in: body
-        name: models.SongDetail
-        required: true
-        schema:
-          $ref: '#/definitions/models.SongDetail'
+        - description: Данные для обновления.
+          in: body
+          name: models.SongDetail
+          required: true
+          schema:
+            $ref: "#/definitions/models.SongDetail"
       produces:
-      - application/json
+        - application/json
       responses:
         "200":
           description: Успешный запрос и обновление параметров.
@@ -148,46 +150,47 @@ paths:
             type: string
       summary: Обновляет параметры песни.
       tags:
-      - library
+        - library
   /list:
     get:
       consumes:
-      - text/plain
-      description: Получает данные из базы и выводит весь список песен из библиотеки
+        - text/plain
+      description:
+        Получает данные из базы и выводит весь список песен из библиотеки
         в соответствии с фильтрами.
       parameters:
-      - description: Имя группы для фильтрации.
-        in: query
-        name: group
-        type: string
-      - description: Название композиции для фильтрации.
-        in: query
-        name: song
-        type: string
-      - description: 'Дата релиза для фильтрации. Формат: DD.MM.YYYY'
-        in: query
-        name: releaseDate
-        type: string
-      - description: Слова в тексте песни для фильтрации
-        in: query
-        name: text
-        type: string
-      - description: Лимит для создания пагинации, по-умолчанию 10.
-        in: query
-        name: limit
-        type: string
-      - description: Смещение для создания пагинации, по-умолчанию 0.
-        in: query
-        name: offset
-        type: string
+        - description: Имя группы для фильтрации.
+          in: query
+          name: group
+          type: string
+        - description: Название композиции для фильтрации.
+          in: query
+          name: song
+          type: string
+        - description: "Дата релиза для фильтрации. Формат: DD.MM.YYYY"
+          in: query
+          name: releaseDate
+          type: string
+        - description: Слова в тексте песни для фильтрации
+          in: query
+          name: text
+          type: string
+        - description: Лимит для создания пагинации, по-умолчанию 10.
+          in: query
+          name: limit
+          type: string
+        - description: Смещение для создания пагинации, по-умолчанию 0.
+          in: query
+          name: offset
+          type: string
       produces:
-      - application/json
+        - application/json
       responses:
         "200":
           description: Успешный запрос с учётом фильтрации.
           schema:
             items:
-              $ref: '#/definitions/db.Library'
+              $ref: "#/definitions/db.Library"
             type: array
         "400":
           description: Некорректный запрос.
@@ -201,26 +204,27 @@ paths:
             type: string
       summary: Выводит весь список песен из библиотеки в соответствии с фильтрами.
       tags:
-      - library
+        - library
   /song/couplet:
     get:
       consumes:
-      - text/plain
-      description: Выводит текст по указанному ID, разбитый на куплеты по страницам,
+        - text/plain
+      description:
+        Выводит текст по указанному ID, разбитый на куплеты по страницам,
         разделяется по символу "\n\n".
       parameters:
-      - description: ID группы для поиска композиции.
-        in: query
-        name: id
-        required: true
-        type: string
-      - description: Номер страницы для пагинации.
-        in: query
-        name: page
-        required: true
-        type: string
+        - description: ID группы для поиска композиции.
+          in: query
+          name: id
+          required: true
+          type: string
+        - description: Номер страницы для пагинации.
+          in: query
+          name: page
+          required: true
+          type: string
       produces:
-      - text/plain
+        - text/plain
       responses:
         "200":
           description: Успешный запрос и разбивка на куплеты.
@@ -234,5 +238,5 @@ paths:
             type: object
       summary: Текст песни по куплетам.
       tags:
-      - library
+        - library
 swagger: "2.0"

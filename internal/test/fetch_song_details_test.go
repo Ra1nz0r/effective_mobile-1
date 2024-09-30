@@ -19,7 +19,7 @@ var MockSongDetail = models.SongDetail{
 	ReleaseDate: "10.10.2006",
 }
 
-func TestFetchSongDetails_Success(t *testing.T) {
+func TestSuccess(t *testing.T) {
 	// Создаем тестовый HTTP-сервер, который будет имитировать внешний API.
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Проверяем, что правильные параметры передаются в запрос.
@@ -42,7 +42,7 @@ func TestFetchSongDetails_Success(t *testing.T) {
 	assert.Equal(t, MockSongDetail, *result)
 }
 
-func TestFetchSongDetails_HttpError(t *testing.T) {
+func TestHttpError(t *testing.T) {
 	// Закрываем HTTP-сервер для имитации ошибки сети.
 	mockServer := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {}))
 	mockServer.Close()
@@ -54,7 +54,7 @@ func TestFetchSongDetails_HttpError(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestFetchSongDetails_StatusNotOK(t *testing.T) {
+func TestStatusNotOK(t *testing.T) {
 	// Создаем тестовый HTTP-сервер, который возвращает статус 500.
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -68,7 +68,7 @@ func TestFetchSongDetails_StatusNotOK(t *testing.T) {
 	assert.EqualError(t, err, "API returned status: 500 Internal Server Error")
 }
 
-func TestFetchSongDetails_BodyReadError(t *testing.T) {
+func TestBodyReadError(t *testing.T) {
 	// Создаем тестовый HTTP-сервер, который возвращает некорректное тело ответа.
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -85,7 +85,7 @@ func TestFetchSongDetails_BodyReadError(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestFetchSongDetails_JSONUnmarshalError(t *testing.T) {
+func TestJSONUnmarshalError(t *testing.T) {
 	// Создаем тестовый HTTP-сервер, который возвращает некорректный JSON.
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)

@@ -300,11 +300,8 @@ func (hq *HandleQueries) TextSongWithPagination(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// Заменяем все символы '\n' в куплетах для корректного вывода.
-	verse := strings.ReplaceAll(couplet[page-1], "\n", "\n")
-
 	// Конфигурируем выходной результат.
-	result := fmt.Sprintf("Group: %s, Song: %s\n\n%s", song.Group, song.Song, verse)
+	result := fmt.Sprintf("Group: %s, Song: %s\n\n%s", song.Group, song.Song, couplet[page-1])
 
 	w.Header().Set("Content-Type", "text/plain; charset=UTF-8")
 

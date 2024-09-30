@@ -18,7 +18,18 @@ import (
 // FetchSongDetails делает запрос во внешний API и возвращает полученные сведения.
 // Формат запроса: http://localhost:7777/info?group=nGroup&song=nSong.
 func FetchSongDetails(nGroup, nSong, externalAPIURL string) (*models.SongDetail, error) {
-	fullURL := fmt.Sprintf("%s?group=%s&song=%s", externalAPIURL, url.PathEscape(nGroup), url.PathEscape(nSong))
+	// Проверяем и парсим внешний URL
+	parsedURL, err := url.Parse(externalAPIURL)
+	if err != nil || (parsedURL.Scheme != "http" && parsedURL.Scheme != "https") {
+		return nil, fmt.Errorf("invalid or unsupported URL scheme: %s", externalAPIURL)
+	}
+
+	// Проверяем наличие хоста в URL
+	if parsedURL.Host == "" {
+		return nil, fmt.Errorf("URL must have a valid host: %s", externalAPIURL)
+	}
+
+	fullURL := fmt.Sprintf("%s?group=%s&song=%s", parsedURL.String(), url.PathEscape(nGroup), url.PathEscape(nSong))
 
 	resp, errResp := http.Get(fullURL)
 	if errResp != nil {

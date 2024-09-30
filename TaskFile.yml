@@ -1,5 +1,5 @@
 ---
-version: '3'
+version: "3"
 
 tasks:
   run: # название задачи для запуска
@@ -25,19 +25,19 @@ tasks:
   sqlc_gen: # название задачи для запуска
     desc: "Generates creation of SQLC files."
     cmds:
-      -  sqlc generate
+      - sqlc generate
 
   swag: # название задачи для запуска
     desc: "Initializes the creation of Swagger documentation."
     cmds:
-      -  swag init -q -g ./cmd/app/main.go
+      - swag init -q -g ./cmd/app/main.go
 
   create_db: # название задачи для запуска
     desc: "Creates a database.."
     cmds:
-      -  sudo -i -u postgres createdb library
+      - sudo -i -u postgres createdb library
 
   drop_db: # название задачи для запуска
     desc: "Deletes the database."
     cmds:
-      -  sudo -i -u postgres dropdb library
+      - sudo -i -u postgres dropdb library
