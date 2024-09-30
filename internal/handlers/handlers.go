@@ -354,6 +354,13 @@ func (hq *HandleQueries) UpdateSong(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Проверям существование песни и возвращаем ошибку, если её нет в базе данных.
+	if _, err := hq.GetOne(r.Context(), upd.ID); err != nil {
+		logger.Zap.Error("ID does not exist")
+		ErrReturn(fmt.Errorf("ID does not exist"), http.StatusBadRequest, w)
+		return
+	}
+
 	// Делаем запрос и обновляем releaseDate, text, link песни в базе данных, в соответствии с полученными.
 	if errUpdate := hq.Update(r.Context(), upd); errUpdate != nil {
 		ErrReturn(fmt.Errorf("can't update task scheduler: %w", errUpdate), http.StatusBadRequest, w)
