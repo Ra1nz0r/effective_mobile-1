@@ -23,10 +23,6 @@ SELECT "group",
 FROM library
 WHERE id = $1
 LIMIT 1;
--- name: ListAll :many
-SELECT *
-FROM library
-ORDER BY id;
 -- name: ListWithFilters :many
 SELECT *
 FROM library

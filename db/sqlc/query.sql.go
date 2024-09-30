@@ -114,42 +114,6 @@ func (q *Queries) GetText(ctx context.Context, id int32) (GetTextRow, error) {
 	return i, err
 }
 
-const listAll = `-- name: ListAll :many
-SELECT id, "group", song, "releaseDate", text, link
-FROM library
-ORDER BY id
-`
-
-func (q *Queries) ListAll(ctx context.Context) ([]Library, error) {
-	rows, err := q.db.QueryContext(ctx, listAll)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Library
-	for rows.Next() {
-		var i Library
-		if err := rows.Scan(
-			&i.ID,
-			&i.Group,
-			&i.Song,
-			&i.ReleaseDate,
-			&i.Text,
-			&i.Link,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const listWithFilters = `-- name: ListWithFilters :many
 SELECT id, "group", song, "releaseDate", text, link
 FROM library
