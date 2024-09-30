@@ -133,7 +133,7 @@ const docTemplate = `{
                     "text/plain"
                 ],
                 "produces": [
-                    "text/plain"
+                    "application/json"
                 ],
                 "tags": [
                     "library"
@@ -203,7 +203,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Дата релиза для фильтрации.",
+                        "description": "Дата релиза для фильтрации. Формат: DD.MM.YYYY",
                         "name": "releaseDate",
                         "in": "query"
                     },
@@ -256,7 +256,7 @@ const docTemplate = `{
         },
         "/song/couplet": {
             "get": {
-                "description": "Выводит текст по указанному ID, разбитый на куплеты по страницам.",
+                "description": "Выводит текст по указанному ID, разбитый на куплеты по страницам, разделяется по символу \"\\n\\n\".",
                 "consumes": [
                     "text/plain"
                 ],

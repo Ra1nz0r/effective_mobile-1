@@ -130,7 +130,7 @@ paths:
         schema:
           $ref: '#/definitions/models.SongDetail'
       produces:
-      - text/plain
+      - application/json
       responses:
         "200":
           description: Успешный запрос и обновление параметров.
@@ -164,7 +164,7 @@ paths:
         in: query
         name: song
         type: string
-      - description: Дата релиза для фильтрации.
+      - description: 'Дата релиза для фильтрации. Формат: DD.MM.YYYY'
         in: query
         name: releaseDate
         type: string
@@ -206,7 +206,8 @@ paths:
     get:
       consumes:
       - text/plain
-      description: Выводит текст по указанному ID, разбитый на куплеты по страницам.
+      description: Выводит текст по указанному ID, разбитый на куплеты по страницам,
+        разделяется по символу "\n\n".
       parameters:
       - description: ID группы для поиска композиции.
         in: query

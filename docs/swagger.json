@@ -127,7 +127,7 @@
                     "text/plain"
                 ],
                 "produces": [
-                    "text/plain"
+                    "application/json"
                 ],
                 "tags": [
                     "library"
@@ -197,7 +197,7 @@
                     },
                     {
                         "type": "string",
-                        "description": "Дата релиза для фильтрации.",
+                        "description": "Дата релиза для фильтрации. Формат: DD.MM.YYYY",
                         "name": "releaseDate",
                         "in": "query"
                     },
@@ -250,7 +250,7 @@
         },
         "/song/couplet": {
             "get": {
-                "description": "Выводит текст по указанному ID, разбитый на куплеты по страницам.",
+                "description": "Выводит текст по указанному ID, разбитый на куплеты по страницам, разделяется по символу \"\\n\\n\".",
                 "consumes": [
                     "text/plain"
                 ],

@@ -69,15 +69,11 @@ func (hq *HandleQueries) AddSongInLibrary(w http.ResponseWriter, r *http.Request
 	if errDet != nil {
 		logger.Zap.Error(errDet)
 
-		res := fmt.Sprintf(
-			`
-			Song ID: %d
-			Unable to get additional information about the song.
-			There is no data or the server is unavailable.
-			The song will be added to the database without additional information.
-			`,
-			insert.ID,
-		)
+		line1 := "Unable to get additional information about the song."
+		line2 := "There is no data or the server is unavailable."
+		line3 := "The song will be added to the database without additional information."
+
+		res := fmt.Sprintf("Song ID: %d\n%s\n%s\n%s", insert.ID, line1, line2, line3)
 
 		w.Header().Set("Content-Type", "text/plain; charset=UTF-8")
 
@@ -188,7 +184,7 @@ func (hq *HandleQueries) DeleteSong(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Param group query string false "Имя группы для фильтрации."
 // @Param song query string false "Название композиции для фильтрации."
-// @Param releaseDate query string false "Дата релиза для фильтрации."
+// @Param releaseDate query string false "Дата релиза для фильтрации. Формат: DD.MM.YYYY"
 // @Param text query string false "Слова в тексте песни для фильтрации"
 // @Param limit query string false "Лимит для создания пагинации, по-умолчанию 10."
 // @Param offset query string false "Смещение для создания пагинации, по-умолчанию 0."
@@ -261,7 +257,7 @@ func (hq *HandleQueries) ListSongsWithFilters(w http.ResponseWriter, r *http.Req
 // Формат запроса: "?id=16&page=1".
 //
 // @Summary Текст песни по куплетам.
-// @Description Выводит текст по указанному ID, разбитый на куплеты по страницам.
+// @Description Выводит текст по указанному ID, разбитый на куплеты по страницам, разделяется по символу "\n\n".
 // @Tags library
 // @Accept  plain
 // @Produce plain
@@ -326,7 +322,7 @@ func (hq *HandleQueries) TextSongWithPagination(w http.ResponseWriter, r *http.R
 // @Description По указанному ID обновляет releaseDate, text, link у песни.
 // @Tags library
 // @Accept  plain
-// @Produce plain
+// @Produce json
 // @Param models.SongDetail body models.SongDetail true "Данные для обновления."
 // @Success 200 {string} string "Успешный запрос и обновление параметров."
 // @Failure 400 {object} map[string]string "Некорректный запрос."
