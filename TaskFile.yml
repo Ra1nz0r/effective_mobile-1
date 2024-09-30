@@ -3,57 +3,41 @@ version: '3'
 
 tasks:
   run: # название задачи для запуска
-    desc: "Runs all '.go' files."
+    desc: "Runs 'main.go' file."
     cmds:
       - go run ./cmd/app
 
-  run_s: # название задачи для запуска
-    desc: "Runs all '.go' files."
-    cmds:
-      - go run ./cmd/server
-  
-  run_a: # название задачи для запуска
-    desc: "Runs all '.go' files."
-    cmds:
-      - go run ./cmd/agent
-      
   test: # название задачи для запуска
     desc: "Runs all test files without cache and with info."
     cmds:
       - go test -v ./... -count=1
 
-  mockgen: # название задачи для запуска
-    desc: "Generates mock files for the storage."
-    cmds:
-      - mockgen -source=internal/storage/metrics.go -destination=internal/storage/mocks/mocks.go -package=mocks
-  
-
-  create_db: # название задачи для запуска
-    desc: "Run docker with changing all default params."
-    cmds:
-      -  sudo -i -u postgres createdb library
-
-  drop_db: # название задачи для запуска
-    desc: "Run docker with changing all default params."
-    cmds:
-      -  sudo -i -u postgres dropdb library
-  
   migrate_up: # название задачи для запуска
-    desc: "Run docker with changing all default params."
+    desc: "Runs the migration file upwards."
     cmds:
       - migrate -path db/migration -database "postgresql://postgres:admin@localhost:5432/library?sslmode=disable" -verbose up
 
   migrate_down: # название задачи для запуска
-    desc: "Run docker with changing all default params."
+    desc: "Runs the migration file down."
     cmds:
       - migrate -path db/migration -database "postgresql://postgres:admin@localhost:5432/library?sslmode=disable" -verbose down
 
   sqlc_gen: # название задачи для запуска
-    desc: "Run docker with changing all default params."
+    desc: "Generates creation of SQLC files."
     cmds:
       -  sqlc generate
 
   swag: # название задачи для запуска
-    desc: "Run docker with changing all default params."
+    desc: "Initializes the creation of Swagger documentation."
     cmds:
       -  swag init -q -g ./cmd/app/main.go
+
+  create_db: # название задачи для запуска
+    desc: "Creates a database.."
+    cmds:
+      -  sudo -i -u postgres createdb library
+
+  drop_db: # название задачи для запуска
+    desc: "Deletes the database."
+    cmds:
+      -  sudo -i -u postgres dropdb library
