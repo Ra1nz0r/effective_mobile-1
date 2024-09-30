@@ -229,9 +229,9 @@ func (hq *HandleQueries) ListSongsWithFilters(w http.ResponseWriter, r *http.Req
 
 	// Делаем запрос в базу данных с учётом указанных параметров фильтра.
 	res, errUpdate := hq.ListWithFilters(r.Context(), params)
-	if errUpdate != nil {
+	if errUpdate != nil || res == nil {
 		logger.Zap.Error("Request could not be processed based on the specified filters.")
-		w.WriteHeader(http.StatusInternalServerError)
+		ErrReturn(fmt.Errorf("there is no data for these filters or the request cannot be processed"), http.StatusBadRequest, w)
 		return
 	}
 
