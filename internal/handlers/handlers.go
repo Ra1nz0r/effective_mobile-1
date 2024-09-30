@@ -143,22 +143,22 @@ func (hq *HandleQueries) AddSongInLibrary(w http.ResponseWriter, r *http.Request
 // @Failure 500 {string} string "Ошибка сервера при удалении песни."
 // @Router /library/delete [delete]
 func (hq *HandleQueries) DeleteSong(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.URL.Query().Get("id"))
+	id, err := services.StringToInt32WithOverflowCheck(r.URL.Query().Get("id"))
 	if err != nil || id < 1 {
-		logger.Zap.Error("invalid string to number conversion or ID number")
-		ErrReturn(fmt.Errorf("invalid string to number conversion or ID number"), http.StatusBadRequest, w)
+		logger.Zap.Error(fmt.Errorf("ID < 1 or %w", err))
+		ErrReturn(fmt.Errorf("ID < 1 or %w", err), http.StatusBadRequest, w)
 		return
 	}
 
 	// Проверям существование песни и возвращаем ошибку, если её нет в базе данных.
-	if _, err = hq.GetOne(r.Context(), int32(id)); err != nil {
+	if _, err = hq.GetOne(r.Context(), id); err != nil {
 		logger.Zap.Error("ID does not exist")
 		ErrReturn(fmt.Errorf("ID does not exist"), http.StatusBadRequest, w)
 		return
 	}
 
 	// Удаляем задачу из базы данных.
-	if err = hq.Delete(r.Context(), int32(id)); err != nil {
+	if err = hq.Delete(r.Context(), id); err != nil {
 		logger.Zap.Error("Delete request failed.")
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -200,12 +200,12 @@ func (hq *HandleQueries) ListSongsWithFilters(w http.ResponseWriter, r *http.Req
 	releaseDate := r.URL.Query().Get("releaseDate")
 	text := r.URL.Query().Get("text")
 
-	limit, err := strconv.Atoi(r.URL.Query().Get("limit"))
+	limit, err := services.StringToInt32WithOverflowCheck(r.URL.Query().Get("limit"))
 	if err != nil || limit <= 0 {
 		limit = hq.PaginationLimit
 	}
 
-	offset, errOffset := strconv.Atoi(r.URL.Query().Get("offset"))
+	offset, errOffset := services.StringToInt32WithOverflowCheck(r.URL.Query().Get("offset"))
 	if errOffset != nil || offset < 0 {
 		offset = 0
 	}
@@ -215,8 +215,8 @@ func (hq *HandleQueries) ListSongsWithFilters(w http.ResponseWriter, r *http.Req
 		Column1: sql.NullString{String: group, Valid: group != ""},
 		Column2: sql.NullString{String: song, Valid: song != ""},
 		Column4: sql.NullString{String: text, Valid: text != ""},
-		Limit:   int32(limit),
-		Offset:  int32(offset),
+		Limit:   limit,
+		Offset:  offset,
 	}
 
 	if releaseDate != "" {
@@ -268,10 +268,10 @@ func (hq *HandleQueries) ListSongsWithFilters(w http.ResponseWriter, r *http.Req
 // @Failure 400 {object} map[string]string "Некорректный запрос."
 // @Router /song/couplet [get]
 func (hq *HandleQueries) TextSongWithPagination(w http.ResponseWriter, r *http.Request) {
-	songID, err := strconv.Atoi(r.URL.Query().Get("id"))
+	songID, err := services.StringToInt32WithOverflowCheck(r.URL.Query().Get("id"))
 	if err != nil || songID < 1 {
-		logger.Zap.Error("invalid string to number conversion or ID number")
-		ErrReturn(fmt.Errorf("invalid string to number conversion or ID number"), http.StatusBadRequest, w)
+		logger.Zap.Error(fmt.Errorf("ID < 1 or %w", err))
+		ErrReturn(fmt.Errorf("ID < 1 or %w", err), http.StatusBadRequest, w)
 		return
 	}
 
@@ -283,7 +283,7 @@ func (hq *HandleQueries) TextSongWithPagination(w http.ResponseWriter, r *http.R
 	}
 
 	// Получаем данные песни из базы данных.
-	song, errSG := hq.GetText(r.Context(), int32(songID))
+	song, errSG := hq.GetText(r.Context(), songID)
 	if errSG != nil {
 		logger.Zap.Error("Unable to retrieve song data.")
 		ErrReturn(fmt.Errorf("invalid ID number"), http.StatusBadRequest, w)

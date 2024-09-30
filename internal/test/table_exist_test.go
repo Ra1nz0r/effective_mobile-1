@@ -4,8 +4,6 @@ import (
 	"errors"
 	"testing"
 
-	"fmt"
-
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/Ra1nz0r/effective_mobile-1/internal/services"
 	"github.com/stretchr/testify/assert"
@@ -14,7 +12,7 @@ import (
 func TestTableExists(t *testing.T) {
 	type args struct {
 		tableName   string
-		buildEXPECT func(mock sqlmock.Sqlmock, query string)
+		buildEXPECT func(mock sqlmock.Sqlmock)
 		boolASSERT  func(t assert.TestingT, exists bool)
 		errorASSERT func(t assert.TestingT, err error)
 	}
@@ -26,8 +24,13 @@ func TestTableExists(t *testing.T) {
 			name: "Success.",
 			args: args{
 				tableName: "test_table",
-				buildEXPECT: func(mock sqlmock.Sqlmock, query string) {
-					mock.ExpectQuery(query).WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
+				buildEXPECT: func(mock sqlmock.Sqlmock) {
+					mock.ExpectQuery(`
+						SELECT EXISTS \(
+							SELECT FROM pg_tables
+							WHERE schemaname = 'public' OR schemaname = 'private'
+							AND tablename = \$1
+						\);`).WithArgs("test_table").WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
 				},
 				boolASSERT: func(t assert.TestingT, exists bool) {
 					assert.True(t, exists)
@@ -41,8 +44,13 @@ func TestTableExists(t *testing.T) {
 			name: "Table does not exist.",
 			args: args{
 				tableName: "nonexistent_table",
-				buildEXPECT: func(mock sqlmock.Sqlmock, query string) {
-					mock.ExpectQuery(query).WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(false))
+				buildEXPECT: func(mock sqlmock.Sqlmock) {
+					mock.ExpectQuery(`
+						SELECT EXISTS \(
+							SELECT FROM pg_tables
+							WHERE schemaname = 'public' OR schemaname = 'private'
+							AND tablename = \$1
+						\);`).WithArgs("nonexistent_table").WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(false))
 				},
 				boolASSERT: func(t assert.TestingT, exists bool) {
 					assert.False(t, exists)
@@ -56,8 +64,13 @@ func TestTableExists(t *testing.T) {
 			name: "Error Query.",
 			args: args{
 				tableName: "test_table",
-				buildEXPECT: func(mock sqlmock.Sqlmock, query string) {
-					mock.ExpectQuery(query).WillReturnError(errors.New("query error"))
+				buildEXPECT: func(mock sqlmock.Sqlmock) {
+					mock.ExpectQuery(`
+						SELECT EXISTS \(
+							SELECT FROM pg_tables
+							WHERE schemaname = 'public' OR schemaname = 'private'
+							AND tablename = \$1
+						\);`).WithArgs("test_table").WillReturnError(errors.New("query error"))
 				},
 				boolASSERT: func(t assert.TestingT, exists bool) {
 					assert.False(t, exists)
@@ -76,14 +89,7 @@ func TestTableExists(t *testing.T) {
 			defer db.Close()
 
 			// Ожидание запроса и его успешный результат
-			query := fmt.Sprintf(`
-		SELECT EXISTS \(
-			SELECT FROM pg_tables
-			WHERE schemaname = 'public' OR schemaname = 'private'
-			AND tablename = '%s'
-		\);`, tt.args.tableName)
-
-			tt.args.buildEXPECT(mock, query)
+			tt.args.buildEXPECT(mock)
 
 			// Вызов тестируемой функции
 			exists, err := services.TableExists(db, tt.args.tableName)
