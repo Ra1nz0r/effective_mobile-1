@@ -18,12 +18,14 @@ import (
 )
 
 type HandleQueries struct {
+	*sql.DB
 	*db.Queries
 	cfg.Config
 }
 
 func NewHandlerQueries(connect *sql.DB, cfg cfg.Config) *HandleQueries {
 	return &HandleQueries{
+		connect,
 		db.New(connect),
 		cfg,
 	}
@@ -41,25 +43,80 @@ func NewHandlerQueries(connect *sql.DB, cfg cfg.Config) *HandleQueries {
 // @Tags library
 // @Accept  json
 // @Produce plain,json
-// @Param db.AddParams body db.AddParams true "Данные из запроса для добавления песни."
-// @Success 200 {string} string "Успешное добавление песни без дополнительных данных."
-// @Success 201 {object} map[string]int32 "Успешное добавление песни с полными данными."
-// @Failure 400 {object} map[string]string "Некорректный запрос."
+// @Param models.AddParams body models.AddParams true "Данные из запроса для добавления песни."
+// @Success 200 {string} string "Успешное добавление песни без дополнительных данных. Возвращает сообщение с ID песни."
+// @Success 201 {object} map[string]int32 "Успешное добавление песни с полными данными. Возвращает ID добавленной песни."
+// @Failure 400 {object} map[string]string "Некорректный запрос, например, если песня уже существует в библиотеке."
 // @Failure 500 {string} string "Ошибка сервера при добавлении или обновлении песни."
 // @Router /library/add [post]
 func (hq *HandleQueries) AddSongInLibrary(w http.ResponseWriter, r *http.Request) {
 	// Получаем group и song из запроса, и помещаем данные в структуру.
-	var baseParam db.AddParams
+	var baseParam models.AddParams
 	if err := json.NewDecoder(r.Body).Decode(&baseParam); err != nil {
 		logger.Zap.Error(err)
 		ErrReturn(fmt.Errorf("invalid request"), http.StatusBadRequest, w)
 		return
 	}
 
-	// Добавляем group и song в базу данных, без дополнительной информации.
-	insert, err := hq.Add(r.Context(), baseParam)
+	// Начинаем выполнение транзакции.
+	tx, err := hq.Begin()
 	if err != nil {
+		logger.Zap.Error(fmt.Errorf("error starting transaction: %w", err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	qtx := hq.WithTx(tx)
+
+	// Проверяем существует ли название группы в базе.
+	groupID, errGrp := qtx.GetArtistID(r.Context(), baseParam.Group)
+	if errGrp == sql.ErrNoRows {
+		// Добавляем имя группы, если не существует.
+		insert, errIns := qtx.AddArtist(r.Context(), baseParam.Group)
+		if errIns != nil {
+			logger.Zap.Error(fmt.Errorf("error adding group: %w", err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		groupID = insert.ID
+
+	} else if errGrp != nil {
+		logger.Zap.Error(fmt.Errorf("error checking group: %w", err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// Проверяем существование песни с указанной группой в базе.
+	songExists, errExs := qtx.CheckSongWithID(r.Context(), db.CheckSongWithIDParams{
+		GroupID: groupID,
+		Song:    baseParam.Song,
+	})
+	if errExs != nil {
+		logger.Zap.Error(fmt.Errorf("error checking song: %w", err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// Если название песни с указанной группой уже существует, то возвращаем сообщение c ошибкой.
+	if songExists {
+		logger.Zap.Debug(fmt.Errorf("song already exists"))
+		ErrReturn(fmt.Errorf("song already exists in the library for this group"), http.StatusBadRequest, w)
+		return
+	}
+
+	// Добавляем новую песню в базу.
+	insertedSong, errInsSong := qtx.AddSongWithID(r.Context(), db.AddSongWithIDParams{
+		GroupID: groupID,
+		Song:    baseParam.Song,
+	})
+	if errInsSong != nil {
 		logger.Zap.Error(fmt.Errorf("error adding song: %w", err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// Завершаем выполнение транзакции.
+	if err = tx.Commit(); err != nil {
+		logger.Zap.Error(fmt.Errorf("error committing transaction: %w", err))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -74,7 +131,7 @@ func (hq *HandleQueries) AddSongInLibrary(w http.ResponseWriter, r *http.Request
 		line2 := "There is no data or the server is unavailable."
 		line3 := "The song will be added to the database without additional information."
 
-		res := fmt.Sprintf("Song ID: %d\n%s\n%s\n%s", insert.ID, line1, line2, line3)
+		res := fmt.Sprintf("Song ID: %d\n%s\n%s\n%s", insertedSong.ID, line1, line2, line3)
 
 		w.Header().Set("Content-Type", "text/plain; charset=UTF-8")
 
@@ -89,7 +146,7 @@ func (hq *HandleQueries) AddSongInLibrary(w http.ResponseWriter, r *http.Request
 
 	// Добавляем в песню дополнительные параметры, полученные из внешнего API.
 	fetch := db.FetchParams{
-		ID:   insert.ID,
+		ID:   insertedSong.ID,
 		Text: details.Text,
 		Link: details.Link,
 	}
@@ -110,7 +167,7 @@ func (hq *HandleQueries) AddSongInLibrary(w http.ResponseWriter, r *http.Request
 	}
 
 	result := map[string]int32{
-		"id": insert.ID,
+		"id": insertedSong.ID,
 	}
 
 	resJSON, errJSON := json.Marshal(result)
@@ -135,11 +192,11 @@ func (hq *HandleQueries) AddSongInLibrary(w http.ResponseWriter, r *http.Request
 // @Summary Удаляет песню из онлайн библиотеки.
 // @Description Обрабатывает DELETE запрос и удаляет песню из библиотеки по указанному ID.
 // @Tags library
-// @Accept  plain
+// @Accept  json
 // @Produce json
-// @Param id query string true "Необходимый ID для удаления песни."
-// @Success 200 {string} string "Успешное удаление песни."
-// @Failure 400 {object} map[string]string "Некорректный запрос."
+// @Param id query int32 true "Необходимый ID для удаления песни."
+// @Success 200 {object} map[string]interface{} "{}" "Песня успешно удалена."
+// @Failure 400 {object} map[string]string "Некорректный запрос. Например, если ID песни некорректен или песня не существует."
 // @Failure 500 {string} string "Ошибка сервера при удалении песни."
 // @Router /library/delete [delete]
 func (hq *HandleQueries) DeleteSong(w http.ResponseWriter, r *http.Request) {
@@ -179,20 +236,20 @@ func (hq *HandleQueries) DeleteSong(w http.ResponseWriter, r *http.Request) {
 // Формат запроса: "?group=Pink Floyd&releaseDate=11.11.2022&limit5&offset=0".
 //
 // @Summary Выводит весь список песен из библиотеки в соответствии с фильтрами.
-// @Description Получает данные из базы и выводит весь список песен из библиотеки в соответствии с фильтрами.
+// @Description Получает данные из базы и выводит весь список песен из библиотеки с возможностью фильтрации по группе, названию песни, дате релиза и тексту. Также поддерживается пагинация.
 // @Tags library
-// @Accept  plain
+// @Accept  json
 // @Produce json
 // @Param group query string false "Имя группы для фильтрации."
 // @Param song query string false "Название композиции для фильтрации."
-// @Param releaseDate query string false "Дата релиза для фильтрации. Формат: DD.MM.YYYY"
-// @Param text query string false "Слова в тексте песни для фильтрации"
-// @Param limit query string false "Лимит для создания пагинации, по-умолчанию 10."
-// @Param offset query string false "Смещение для создания пагинации, по-умолчанию 0."
-// @Success 200 {object} []db.Library "Успешный запрос с учётом фильтрации."
-// @Failure 400 {object} map[string]string "Некорректный запрос."
-// @Failure 500 {string} string "Ошибка сервера при создании фильтрации."
-// @Router /list [get]
+// @Param releaseDate query string false "Дата релиза для фильтрации. Формат: DD.MM.YYYY."
+// @Param text query string false "Слова в тексте песни для фильтрации."
+// @Param limit query int false "Лимит для создания пагинации. Значение по умолчанию: 10."
+// @Param offset query int false "Смещение для создания пагинации. Значение по умолчанию: 0."
+// @Success 200 {array} db.Library "Успешный запрос с учётом фильтрации."
+// @Failure 400 {object} map[string]string "Некорректный запрос, например, неверный формат даты."
+// @Failure 500 {string} string "Ошибка сервера при обработке запроса."
+// @Router /library/list [get]
 func (hq *HandleQueries) ListSongsWithFilters(w http.ResponseWriter, r *http.Request) {
 	// Чтение параметров запроса из URL.
 	group := r.URL.Query().Get("group")
@@ -258,14 +315,14 @@ func (hq *HandleQueries) ListSongsWithFilters(w http.ResponseWriter, r *http.Req
 // Формат запроса: "?id=16&page=1".
 //
 // @Summary Текст песни по куплетам.
-// @Description Выводит текст по указанному ID, разбитый на куплеты по страницам, разделяется по символу "\n\n".
+// @Description Выводит текст песни по указанному ID, разбитый на куплеты (по страницам), разделенные символом "\n\n".
 // @Tags library
 // @Accept  plain
 // @Produce plain
-// @Param id query string true "ID группы для поиска композиции."
-// @Param page query string true "Номер страницы для пагинации."
-// @Success 200 {string} string "Успешный запрос и разбивка на куплеты."
-// @Failure 400 {object} map[string]string "Некорректный запрос."
+// @Param id query int true "ID песни для поиска композиции."
+// @Param page query int true "Номер страницы для пагинации."
+// @Success 200 {string} string "Успешный запрос, текст куплета."
+// @Failure 400 {object} map[string]string "Некорректный запрос (например, неверный ID или номер страницы)."
 // @Router /song/couplet [get]
 func (hq *HandleQueries) TextSongWithPagination(w http.ResponseWriter, r *http.Request) {
 	songID, err := services.StringToInt32WithOverflowCheck(r.URL.Query().Get("id"))
@@ -317,14 +374,14 @@ func (hq *HandleQueries) TextSongWithPagination(w http.ResponseWriter, r *http.R
 // Формат запроса: {"id": 3, "releaseDate": "11.04.2022", "text": "You set my soul alight", "link": "ops link"}.
 //
 // @Summary Обновляет параметры песни.
-// @Description По указанному ID обновляет releaseDate, text, link у песни.
+// @Description Обновляет параметры песни (releaseDate, text, link) по указанному ID.
 // @Tags library
-// @Accept  plain
+// @Accept  json
 // @Produce json
-// @Param models.SongDetail body models.SongDetail true "Данные для обновления."
-// @Success 200 {string} string "Успешный запрос и обновление параметров."
-// @Failure 400 {object} map[string]string "Некорректный запрос."
-// @Failure 500 {string} string "Ошибка сервера при обновлении параметров."
+// @Param data body models.SongDetail true "Данные для обновления (releaseDate, text, link). Формат даты: DD.MM.YYYY."
+// @Success 200 {object} map[string]interface{} "{}"
+// @Failure 400 {object} map[string]string "Некорректный запрос (например, неверные данные или формат запроса)."
+// @Failure 500 {string} string "Ошибка сервера при обновлении песни."
 // @Router /library/update [put]
 func (hq *HandleQueries) UpdateSong(w http.ResponseWriter, r *http.Request) {
 	// Обрабатываем полученные данные из JSON и записываем в структуру.
@@ -335,39 +392,46 @@ func (hq *HandleQueries) UpdateSong(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Заполняем данные для запроса в базу данных в соответствии с полученными данными.
-	upd := db.UpdateParams{
-		ID:   sd.ID,
-		Text: sd.Text,
-		Link: sd.Link,
-	}
-
-	// Приводим дату к нужному формату и обновляем дату в UpdateParams.
+	// Инициализация полей с пустыми значениями по умолчанию
+	var releaseDate time.Time
 	var errParse error
-	upd.ReleaseDate, errParse = time.Parse("02.01.2006", sd.ReleaseDate)
-	if errParse != nil {
-		logger.Zap.Error("Error parsing date: %w", errParse)
-		ErrReturn(fmt.Errorf("incorrect date format, expected DD.MM.YYYY: %w", errParse), http.StatusBadRequest, w)
-		return
+
+	// Проверяем, была ли передана дата
+	if sd.ReleaseDate != "" {
+		releaseDate, errParse = time.Parse("02.01.2006", sd.ReleaseDate)
+		if errParse != nil {
+			logger.Zap.Error("Error parsing date: %w", errParse)
+			ErrReturn(fmt.Errorf("incorrect date format, expected DD.MM.YYYY: %w", errParse), http.StatusBadRequest, w)
+			return
+		}
+	} else {
+		// Если дата не передана, оставляем текущую дату в базе данных
+		releaseDate = time.Time{} // Пустая дата для обработки в SQL
 	}
 
-	// Проверям существование песни и возвращаем ошибку, если её нет в базе данных.
-	if _, err := hq.GetOne(r.Context(), upd.ID); err != nil {
+	// Проверяем существование записи в базе данных
+	if _, err := hq.GetOne(r.Context(), sd.ID); err != nil {
 		logger.Zap.Error("ID does not exist")
 		ErrReturn(fmt.Errorf("ID does not exist"), http.StatusBadRequest, w)
 		return
 	}
 
-	// Делаем запрос и обновляем releaseDate, text, link песни в базе данных, в соответствии с полученными.
+	// Подготавливаем параметры для обновления
+	upd := db.UpdateParams{
+		ID:      sd.ID,
+		Column2: releaseDate, // Передаём пустое значение, если дата не обновляется
+		Column3: sd.Text,     // Если поле не нужно обновлять, передадим пустую строку
+		Column4: sd.Link,     // Если поле не нужно обновлять, передадим пустую строку
+	}
+
+	// Выполняем обновление
 	if errUpdate := hq.Update(r.Context(), upd); errUpdate != nil {
-		ErrReturn(fmt.Errorf("can't update task scheduler: %w", errUpdate), http.StatusBadRequest, w)
+		ErrReturn(fmt.Errorf("can't update song: %w", errUpdate), http.StatusBadRequest, w)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-
 	w.WriteHeader(http.StatusOK)
-
 	if _, errWrite := w.Write([]byte(`{}`)); errWrite != nil {
 		logger.Zap.Error("failed attempt WRITE response")
 		return

@@ -1,16 +1,9 @@
 basePath: /
 definitions:
-  db.AddParams:
-    properties:
-      group:
-        type: string
-      song:
-        type: string
-    type: object
   db.Library:
     properties:
-      group:
-        type: string
+      group_id:
+        type: integer
       id:
         type: integer
       link:
@@ -20,6 +13,13 @@ definitions:
       song:
         type: string
       text:
+        type: string
+    type: object
+  models.AddParams:
+    properties:
+      group:
+        type: string
+      song:
         type: string
     type: object
   models.SongDetail:
@@ -39,42 +39,46 @@ info:
     email: n52rus@gmail.com
     name: Artem Rylskii
     url: https://t.me/Rainz0r
-  description: Implementation of an online song library.
+  description: REST API для управления онлайн-библиотекой песен. Включает функции
+    добавления, обновления, удаления и поиска песен, а также взаимодействие с внешними
+    сервисами для получения дополнительной информации о композициях.
   termsOfService: http://swagger.io/terms/
-  title: Music Library
+  title: Music Library API
   version: "1.0"
 paths:
   /library/add:
     post:
       consumes:
-        - application/json
-      description:
-        Добавляет песню в базу данных и делает запрос во внешнее API для
+      - application/json
+      description: Добавляет песню в базу данных и делает запрос во внешнее API для
         получения дополнительных сведений. Если внешнее API недоступно, песня добавляется
         без дополнительных данных.
       parameters:
-        - description: Данные из запроса для добавления песни.
-          in: body
-          name: db.AddParams
-          required: true
-          schema:
-            $ref: "#/definitions/db.AddParams"
+      - description: Данные из запроса для добавления песни.
+        in: body
+        name: models.AddParams
+        required: true
+        schema:
+          $ref: '#/definitions/models.AddParams'
       produces:
-        - text/plain
-        - application/json
+      - text/plain
+      - application/json
       responses:
         "200":
-          description: Успешное добавление песни без дополнительных данных.
+          description: Успешное добавление песни без дополнительных данных. Возвращает
+            сообщение с ID песни.
           schema:
             type: string
         "201":
-          description: Успешное добавление песни с полными данными.
+          description: Успешное добавление песни с полными данными. Возвращает ID
+            добавленной песни.
           schema:
             additionalProperties:
               type: integer
             type: object
         "400":
-          description: Некорректный запрос.
+          description: Некорректный запрос, например, если песня уже существует в
+            библиотеке.
           schema:
             additionalProperties:
               type: string
@@ -85,29 +89,30 @@ paths:
             type: string
       summary: Добавляет песню в онлайн библиотеку.
       tags:
-        - library
+      - library
   /library/delete:
     delete:
       consumes:
-        - text/plain
-      description:
-        Обрабатывает DELETE запрос и удаляет песню из библиотеки по указанному
+      - application/json
+      description: Обрабатывает DELETE запрос и удаляет песню из библиотеки по указанному
         ID.
       parameters:
-        - description: Необходимый ID для удаления песни.
-          in: query
-          name: id
-          required: true
-          type: string
+      - description: Необходимый ID для удаления песни.
+        in: query
+        name: id
+        required: true
+        type: integer
       produces:
-        - application/json
+      - application/json
       responses:
         "200":
-          description: Успешное удаление песни.
+          description: '{}" "Песня успешно удалена.'
           schema:
-            type: string
+            additionalProperties: true
+            type: object
         "400":
-          description: Некорректный запрос.
+          description: Некорректный запрос. Например, если ID песни некорректен или
+            песня не существует.
           schema:
             additionalProperties:
               type: string
@@ -118,125 +123,126 @@ paths:
             type: string
       summary: Удаляет песню из онлайн библиотеки.
       tags:
-        - library
-  /library/update:
-    put:
-      consumes:
-        - text/plain
-      description: По указанному ID обновляет releaseDate, text, link у песни.
-      parameters:
-        - description: Данные для обновления.
-          in: body
-          name: models.SongDetail
-          required: true
-          schema:
-            $ref: "#/definitions/models.SongDetail"
-      produces:
-        - application/json
-      responses:
-        "200":
-          description: Успешный запрос и обновление параметров.
-          schema:
-            type: string
-        "400":
-          description: Некорректный запрос.
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "500":
-          description: Ошибка сервера при обновлении параметров.
-          schema:
-            type: string
-      summary: Обновляет параметры песни.
-      tags:
-        - library
-  /list:
+      - library
+  /library/list:
     get:
       consumes:
-        - text/plain
-      description:
-        Получает данные из базы и выводит весь список песен из библиотеки
-        в соответствии с фильтрами.
+      - application/json
+      description: Получает данные из базы и выводит весь список песен из библиотеки
+        с возможностью фильтрации по группе, названию песни, дате релиза и тексту.
+        Также поддерживается пагинация.
       parameters:
-        - description: Имя группы для фильтрации.
-          in: query
-          name: group
-          type: string
-        - description: Название композиции для фильтрации.
-          in: query
-          name: song
-          type: string
-        - description: "Дата релиза для фильтрации. Формат: DD.MM.YYYY"
-          in: query
-          name: releaseDate
-          type: string
-        - description: Слова в тексте песни для фильтрации
-          in: query
-          name: text
-          type: string
-        - description: Лимит для создания пагинации, по-умолчанию 10.
-          in: query
-          name: limit
-          type: string
-        - description: Смещение для создания пагинации, по-умолчанию 0.
-          in: query
-          name: offset
-          type: string
+      - description: Имя группы для фильтрации.
+        in: query
+        name: group
+        type: string
+      - description: Название композиции для фильтрации.
+        in: query
+        name: song
+        type: string
+      - description: 'Дата релиза для фильтрации. Формат: DD.MM.YYYY.'
+        in: query
+        name: releaseDate
+        type: string
+      - description: Слова в тексте песни для фильтрации.
+        in: query
+        name: text
+        type: string
+      - description: 'Лимит для создания пагинации. Значение по умолчанию: 10.'
+        in: query
+        name: limit
+        type: integer
+      - description: 'Смещение для создания пагинации. Значение по умолчанию: 0.'
+        in: query
+        name: offset
+        type: integer
       produces:
-        - application/json
+      - application/json
       responses:
         "200":
           description: Успешный запрос с учётом фильтрации.
           schema:
             items:
-              $ref: "#/definitions/db.Library"
+              $ref: '#/definitions/db.Library'
             type: array
         "400":
-          description: Некорректный запрос.
+          description: Некорректный запрос, например, неверный формат даты.
           schema:
             additionalProperties:
               type: string
             type: object
         "500":
-          description: Ошибка сервера при создании фильтрации.
+          description: Ошибка сервера при обработке запроса.
           schema:
             type: string
       summary: Выводит весь список песен из библиотеки в соответствии с фильтрами.
       tags:
-        - library
+      - library
+  /library/update:
+    put:
+      consumes:
+      - application/json
+      description: Обновляет параметры песни (releaseDate, text, link) по указанному
+        ID.
+      parameters:
+      - description: Данные для обновления (releaseDate, text, link).
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/models.SongDetail'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{}'
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Некорректный запрос (например, неверные данные или формат запроса).
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Ошибка сервера при обновлении песни.
+          schema:
+            type: string
+      summary: Обновляет параметры песни.
+      tags:
+      - library
   /song/couplet:
     get:
       consumes:
-        - text/plain
-      description:
-        Выводит текст по указанному ID, разбитый на куплеты по страницам,
-        разделяется по символу "\n\n".
+      - text/plain
+      description: Выводит текст песни по указанному ID, разбитый на куплеты (по страницам),
+        разделенные символом "\n\n".
       parameters:
-        - description: ID группы для поиска композиции.
-          in: query
-          name: id
-          required: true
-          type: string
-        - description: Номер страницы для пагинации.
-          in: query
-          name: page
-          required: true
-          type: string
+      - description: ID песни для поиска композиции.
+        in: query
+        name: id
+        required: true
+        type: integer
+      - description: Номер страницы для пагинации.
+        in: query
+        name: page
+        required: true
+        type: integer
       produces:
-        - text/plain
+      - text/plain
       responses:
         "200":
-          description: Успешный запрос и разбивка на куплеты.
+          description: Успешный запрос, текст куплета.
           schema:
             type: string
         "400":
-          description: Некорректный запрос.
+          description: Некорректный запрос (например, неверный ID или номер страницы).
           schema:
             additionalProperties:
               type: string
             type: object
       summary: Текст песни по куплетам.
       tags:
-        - library
+      - library
 swagger: "2.0"

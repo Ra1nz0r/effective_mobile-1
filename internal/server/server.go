@@ -88,7 +88,7 @@ func Run() {
 	r.Group(func(r chi.Router) {
 		r.Use(queries.WithResponseDetails)
 
-		r.Get("/list", queries.ListSongsWithFilters)
+		r.Get("/library/list", queries.ListSongsWithFilters)
 		r.Get("/song/couplet", queries.TextSongWithPagination)
 	})
 

@@ -8,9 +8,9 @@ import (
 	_ "github.com/jackc/pgx/v4/stdlib"
 )
 
-// @title Music Library
+// @title Music Library API
 // @version 1.0
-// @description Implementation of an online song library.
+// @description REST API для управления онлайн-библиотекой песен. Включает функции добавления, обновления, удаления и поиска песен, а также взаимодействие с внешними сервисами для получения дополнительной информации о композициях.
 // @termsOfService http://swagger.io/terms/
 
 // @contact.name Artem Rylskii

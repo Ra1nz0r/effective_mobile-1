@@ -11,29 +11,63 @@ import (
 	"time"
 )
 
-const add = `-- name: Add :one
-INSERT INTO library ("group", song)
-VALUES ($1, $2)
-RETURNING id, "group", song, "releaseDate", text, link
+const addArtist = `-- name: AddArtist :one
+INSERT INTO artist ("group")
+VALUES ($1)
+RETURNING id, "group"
 `
 
-type AddParams struct {
-	Group string `json:"group"`
-	Song  string `json:"song"`
+func (q *Queries) AddArtist(ctx context.Context, group string) (Artist, error) {
+	row := q.db.QueryRowContext(ctx, addArtist, group)
+	var i Artist
+	err := row.Scan(&i.ID, &i.Group)
+	return i, err
 }
 
-func (q *Queries) Add(ctx context.Context, arg AddParams) (Library, error) {
-	row := q.db.QueryRowContext(ctx, add, arg.Group, arg.Song)
+const addSongWithID = `-- name: AddSongWithID :one
+INSERT INTO library (group_id, "song")
+VALUES ($1, $2)
+RETURNING id, group_id, song, "releaseDate", text, link
+`
+
+type AddSongWithIDParams struct {
+	GroupID int32  `json:"group_id"`
+	Song    string `json:"song"`
+}
+
+func (q *Queries) AddSongWithID(ctx context.Context, arg AddSongWithIDParams) (Library, error) {
+	row := q.db.QueryRowContext(ctx, addSongWithID, arg.GroupID, arg.Song)
 	var i Library
 	err := row.Scan(
 		&i.ID,
-		&i.Group,
+		&i.GroupID,
 		&i.Song,
 		&i.ReleaseDate,
 		&i.Text,
 		&i.Link,
 	)
 	return i, err
+}
+
+const checkSongWithID = `-- name: CheckSongWithID :one
+SELECT EXISTS (
+        SELECT 1
+        FROM library
+        WHERE group_id = $1
+            AND song = $2
+    )
+`
+
+type CheckSongWithIDParams struct {
+	GroupID int32  `json:"group_id"`
+	Song    string `json:"song"`
+}
+
+func (q *Queries) CheckSongWithID(ctx context.Context, arg CheckSongWithIDParams) (bool, error) {
+	row := q.db.QueryRowContext(ctx, checkSongWithID, arg.GroupID, arg.Song)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
 }
 
 const delete = `-- name: Delete :exec
@@ -71,8 +105,22 @@ func (q *Queries) Fetch(ctx context.Context, arg FetchParams) error {
 	return err
 }
 
+const getArtistID = `-- name: GetArtistID :one
+SELECT id
+FROM artist
+WHERE "group" = $1
+LIMIT 1
+`
+
+func (q *Queries) GetArtistID(ctx context.Context, group string) (int32, error) {
+	row := q.db.QueryRowContext(ctx, getArtistID, group)
+	var id int32
+	err := row.Scan(&id)
+	return id, err
+}
+
 const getOne = `-- name: GetOne :one
-SELECT id, "group", song, "releaseDate", text, link
+SELECT id, group_id, song, "releaseDate", text, link
 FROM library
 WHERE id = $1
 LIMIT 1
@@ -83,7 +131,7 @@ func (q *Queries) GetOne(ctx context.Context, id int32) (Library, error) {
 	var i Library
 	err := row.Scan(
 		&i.ID,
-		&i.Group,
+		&i.GroupID,
 		&i.Song,
 		&i.ReleaseDate,
 		&i.Text,
@@ -93,15 +141,18 @@ func (q *Queries) GetOne(ctx context.Context, id int32) (Library, error) {
 }
 
 const getText = `-- name: GetText :one
-SELECT "group",
-    song,
-    text
+SELECT library.id,
+    artist."group",
+    library.song,
+    library.text
 FROM library
-WHERE id = $1
+    JOIN artist ON library.group_id = artist.id
+WHERE library.id = $1
 LIMIT 1
 `
 
 type GetTextRow struct {
+	ID    int32  `json:"id"`
 	Group string `json:"group"`
 	Song  string `json:"song"`
 	Text  string `json:"text"`
@@ -110,30 +161,41 @@ type GetTextRow struct {
 func (q *Queries) GetText(ctx context.Context, id int32) (GetTextRow, error) {
 	row := q.db.QueryRowContext(ctx, getText, id)
 	var i GetTextRow
-	err := row.Scan(&i.Group, &i.Song, &i.Text)
+	err := row.Scan(
+		&i.ID,
+		&i.Group,
+		&i.Song,
+		&i.Text,
+	)
 	return i, err
 }
 
 const listWithFilters = `-- name: ListWithFilters :many
-SELECT id, "group", song, "releaseDate", text, link
+SELECT library.id,
+    artist."group",
+    library.song,
+    library."releaseDate",
+    library.text,
+    library.link
 FROM library
+    JOIN artist ON library.group_id = artist.id
 WHERE (
-        "group" ILIKE '%' || $1 || '%'
+        artist."group" ILIKE '%' || $1 || '%'
         OR $1 IS NULL
     )
     AND (
-        song ILIKE '%' || $2 || '%'
+        library.song ILIKE '%' || $2 || '%'
         OR $2 IS NULL
     )
     AND (
-        "releaseDate" >= $3
+        library."releaseDate" >= $3
         OR $3 IS NULL
     )
     AND (
-        "text" ILIKE '%' || $4 || '%'
+        library."text" ILIKE '%' || $4 || '%'
         OR $4 IS NULL
     )
-ORDER BY id
+ORDER BY library.id
 LIMIT $5 OFFSET $6
 `
 
@@ -146,7 +208,16 @@ type ListWithFiltersParams struct {
 	Offset      int32          `json:"offset"`
 }
 
-func (q *Queries) ListWithFilters(ctx context.Context, arg ListWithFiltersParams) ([]Library, error) {
+type ListWithFiltersRow struct {
+	ID          int32     `json:"id"`
+	Group       string    `json:"group"`
+	Song        string    `json:"song"`
+	ReleaseDate time.Time `json:"releaseDate"`
+	Text        string    `json:"text"`
+	Link        string    `json:"link"`
+}
+
+func (q *Queries) ListWithFilters(ctx context.Context, arg ListWithFiltersParams) ([]ListWithFiltersRow, error) {
 	rows, err := q.db.QueryContext(ctx, listWithFilters,
 		arg.Column1,
 		arg.Column2,
@@ -159,9 +230,9 @@ func (q *Queries) ListWithFilters(ctx context.Context, arg ListWithFiltersParams
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Library
+	var items []ListWithFiltersRow
 	for rows.Next() {
-		var i Library
+		var i ListWithFiltersRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.Group,
@@ -185,25 +256,28 @@ func (q *Queries) ListWithFilters(ctx context.Context, arg ListWithFiltersParams
 
 const update = `-- name: Update :exec
 UPDATE library
-SET "releaseDate" = $2,
-    "text" = $3,
-    link = $4
+SET "releaseDate" = COALESCE(
+        NULLIF($2::date, '0001-01-01'::date),
+        "releaseDate"
+    ),
+    "text" = COALESCE(NULLIF($3, ''), "text"),
+    link = COALESCE(NULLIF($4, ''), link)
 WHERE id = $1
 `
 
 type UpdateParams struct {
-	ID          int32     `json:"id"`
-	ReleaseDate time.Time `json:"releaseDate"`
-	Text        string    `json:"text"`
-	Link        string    `json:"link"`
+	ID      int32       `json:"id"`
+	Column2 time.Time   `json:"column_2"`
+	Column3 interface{} `json:"column_3"`
+	Column4 interface{} `json:"column_4"`
 }
 
 func (q *Queries) Update(ctx context.Context, arg UpdateParams) error {
 	_, err := q.db.ExecContext(ctx, update,
 		arg.ID,
-		arg.ReleaseDate,
-		arg.Text,
-		arg.Link,
+		arg.Column2,
+		arg.Column3,
+		arg.Column4,
 	)
 	return err
 }

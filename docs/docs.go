@@ -37,23 +37,23 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "description": "Данные из запроса для добавления песни.",
-                        "name": "db.AddParams",
+                        "name": "models.AddParams",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/db.AddParams"
+                            "$ref": "#/definitions/models.AddParams"
                         }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Успешное добавление песни без дополнительных данных.",
+                        "description": "Успешное добавление песни без дополнительных данных. Возвращает сообщение с ID песни.",
                         "schema": {
                             "type": "string"
                         }
                     },
                     "201": {
-                        "description": "Успешное добавление песни с полными данными.",
+                        "description": "Успешное добавление песни с полными данными. Возвращает ID добавленной песни.",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -62,7 +62,7 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Некорректный запрос.",
+                        "description": "Некорректный запрос, например, если песня уже существует в библиотеке.",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -83,7 +83,7 @@ const docTemplate = `{
             "delete": {
                 "description": "Обрабатывает DELETE запрос и удаляет песню из библиотеки по указанному ID.",
                 "consumes": [
-                    "text/plain"
+                    "application/json"
                 ],
                 "produces": [
                     "application/json"
@@ -94,7 +94,7 @@ const docTemplate = `{
                 "summary": "Удаляет песню из онлайн библиотеки.",
                 "parameters": [
                     {
-                        "type": "string",
+                        "type": "integer",
                         "description": "Необходимый ID для удаления песни.",
                         "name": "id",
                         "in": "query",
@@ -103,13 +103,14 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "Успешное удаление песни.",
+                        "description": "{}\" \"Песня успешно удалена.",
                         "schema": {
-                            "type": "string"
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     },
                     "400": {
-                        "description": "Некорректный запрос.",
+                        "description": "Некорректный запрос. Например, если ID песни некорректен или песня не существует.",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -126,60 +127,11 @@ const docTemplate = `{
                 }
             }
         },
-        "/library/update": {
-            "put": {
-                "description": "По указанному ID обновляет releaseDate, text, link у песни.",
-                "consumes": [
-                    "text/plain"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "library"
-                ],
-                "summary": "Обновляет параметры песни.",
-                "parameters": [
-                    {
-                        "description": "Данные для обновления.",
-                        "name": "models.SongDetail",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/models.SongDetail"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Успешный запрос и обновление параметров.",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "400": {
-                        "description": "Некорректный запрос.",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Ошибка сервера при обновлении параметров.",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                }
-            }
-        },
-        "/list": {
+        "/library/list": {
             "get": {
-                "description": "Получает данные из базы и выводит весь список песен из библиотеки в соответствии с фильтрами.",
+                "description": "Получает данные из базы и выводит весь список песен из библиотеки с возможностью фильтрации по группе, названию песни, дате релиза и тексту. Также поддерживается пагинация.",
                 "consumes": [
-                    "text/plain"
+                    "application/json"
                 ],
                 "produces": [
                     "application/json"
@@ -203,25 +155,25 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Дата релиза для фильтрации. Формат: DD.MM.YYYY",
+                        "description": "Дата релиза для фильтрации. Формат: DD.MM.YYYY.",
                         "name": "releaseDate",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "description": "Слова в тексте песни для фильтрации",
+                        "description": "Слова в тексте песни для фильтрации.",
                         "name": "text",
                         "in": "query"
                     },
                     {
-                        "type": "string",
-                        "description": "Лимит для создания пагинации, по-умолчанию 10.",
+                        "type": "integer",
+                        "description": "Лимит для создания пагинации. Значение по умолчанию: 10.",
                         "name": "limit",
                         "in": "query"
                     },
                     {
-                        "type": "string",
-                        "description": "Смещение для создания пагинации, по-умолчанию 0.",
+                        "type": "integer",
+                        "description": "Смещение для создания пагинации. Значение по умолчанию: 0.",
                         "name": "offset",
                         "in": "query"
                     }
@@ -237,7 +189,7 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Некорректный запрос.",
+                        "description": "Некорректный запрос, например, неверный формат даты.",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -246,7 +198,57 @@ const docTemplate = `{
                         }
                     },
                     "500": {
-                        "description": "Ошибка сервера при создании фильтрации.",
+                        "description": "Ошибка сервера при обработке запроса.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/library/update": {
+            "put": {
+                "description": "Обновляет параметры песни (releaseDate, text, link) по указанному ID.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "library"
+                ],
+                "summary": "Обновляет параметры песни.",
+                "parameters": [
+                    {
+                        "description": "Данные для обновления (releaseDate, text, link).",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.SongDetail"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "{}",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Некорректный запрос (например, неверные данные или формат запроса).",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Ошибка сервера при обновлении песни.",
                         "schema": {
                             "type": "string"
                         }
@@ -256,7 +258,7 @@ const docTemplate = `{
         },
         "/song/couplet": {
             "get": {
-                "description": "Выводит текст по указанному ID, разбитый на куплеты по страницам, разделяется по символу \"\\n\\n\".",
+                "description": "Выводит текст песни по указанному ID, разбитый на куплеты (по страницам), разделенные символом \"\\n\\n\".",
                 "consumes": [
                     "text/plain"
                 ],
@@ -269,14 +271,14 @@ const docTemplate = `{
                 "summary": "Текст песни по куплетам.",
                 "parameters": [
                     {
-                        "type": "string",
-                        "description": "ID группы для поиска композиции.",
+                        "type": "integer",
+                        "description": "ID песни для поиска композиции.",
                         "name": "id",
                         "in": "query",
                         "required": true
                     },
                     {
-                        "type": "string",
+                        "type": "integer",
                         "description": "Номер страницы для пагинации.",
                         "name": "page",
                         "in": "query",
@@ -285,13 +287,13 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "Успешный запрос и разбивка на куплеты.",
+                        "description": "Успешный запрос, текст куплета.",
                         "schema": {
                             "type": "string"
                         }
                     },
                     "400": {
-                        "description": "Некорректный запрос.",
+                        "description": "Некорректный запрос (например, неверный ID или номер страницы).",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -304,22 +306,11 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "db.AddParams": {
-            "type": "object",
-            "properties": {
-                "group": {
-                    "type": "string"
-                },
-                "song": {
-                    "type": "string"
-                }
-            }
-        },
         "db.Library": {
             "type": "object",
             "properties": {
-                "group": {
-                    "type": "string"
+                "group_id": {
+                    "type": "integer"
                 },
                 "id": {
                     "type": "integer"
@@ -334,6 +325,17 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "text": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.AddParams": {
+            "type": "object",
+            "properties": {
+                "group": {
+                    "type": "string"
+                },
+                "song": {
                     "type": "string"
                 }
             }
@@ -364,8 +366,8 @@ var SwaggerInfo = &swag.Spec{
 	Host:             "localhost:7654",
 	BasePath:         "/",
 	Schemes:          []string{},
-	Title:            "Music Library",
-	Description:      "Implementation of an online song library.",
+	Title:            "Music Library API",
+	Description:      "REST API для управления онлайн-библиотекой песен. Включает функции добавления, обновления, удаления и поиска песен, а также взаимодействие с внешними сервисами для получения дополнительной информации о композициях.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

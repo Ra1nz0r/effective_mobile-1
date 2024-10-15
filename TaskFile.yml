@@ -33,7 +33,7 @@ tasks:
       - swag init -q -g ./cmd/app/main.go
 
   create_db: # название задачи для запуска
-    desc: "Creates a database.."
+    desc: "Creates a database."
     cmds:
       - sudo -i -u postgres createdb library
 

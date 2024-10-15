@@ -8,9 +8,14 @@ import (
 	"time"
 )
 
+type Artist struct {
+	ID    int32  `json:"id"`
+	Group string `json:"group"`
+}
+
 type Library struct {
 	ID          int32     `json:"id"`
-	Group       string    `json:"group"`
+	GroupID     int32     `json:"group_id"`
 	Song        string    `json:"song"`
 	ReleaseDate time.Time `json:"releaseDate"`
 	Text        string    `json:"text"`
