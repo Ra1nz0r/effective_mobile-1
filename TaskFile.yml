@@ -1,73 +1,43 @@
 ---
-version: '3'
+version: "3"
 
 tasks:
   run: # название задачи для запуска
-    desc: "Runs all '.go' files."
+    desc: "Runs 'main.go' file."
     cmds:
-      - go run ./...
+      - go run ./cmd/app
 
-  run_s: # название задачи для запуска
-    desc: "Runs all '.go' files."
-    cmds:
-      - go run ./cmd/server
-  
-  run_a: # название задачи для запуска
-    desc: "Runs all '.go' files."
-    cmds:
-      - go run ./cmd/agent
-      
   test: # название задачи для запуска
     desc: "Runs all test files without cache and with info."
     cmds:
       - go test -v ./... -count=1
 
-  mockgen: # название задачи для запуска
-    desc: "Generates mock files for the storage."
+  migrate_up: # название задачи для запуска
+    desc: "Runs the migration file upwards."
     cmds:
-      - mockgen -source=internal/storage/metrics.go -destination=internal/storage/mocks/mocks.go -package=mocks
-      
-  d_build: # название задачи для запуска
-    desc: "Build docker container."
-    cmds:
-      - docker build -t scheduler_app:v1 .
+      - migrate -path db/migration -database "postgresql://postgres:admin@localhost:5432/library?sslmode=disable" -verbose up
 
-  d_run_it: # название задачи для запуска
-    desc: "Run terminal (-it) when container is running."
+  migrate_down: # название задачи для запуска
+    desc: "Runs the migration file down."
     cmds:
-      - docker exec -it sched_app /bin/bash
+      - migrate -path db/migration -database "postgresql://postgres:admin@localhost:5432/library?sslmode=disable" -verbose down
 
-  d_read_env: # название задачи для запуска
-    desc: "Run docker container with reading all params from '.env'."
+  sqlc_gen: # название задачи для запуска
+    desc: "Generates creation of SQLC files."
     cmds:
-      - docker run --name="sched_app" -d --env-file .env -p 7540:7540 scheduler_app:v1
-  
-  d_expose: # название задачи для запуска
-    desc: "Run docker through EXPOSE on default 7540 PORT."
-    cmds:
-      - docker run --name="sched_app" -d -P scheduler_app:v1
+      - sqlc generate
 
-  d_def_port: # название задачи для запуска
-    desc: "Run docker with default 7540 PORT."
+  swag: # название задачи для запуска
+    desc: "Initializes the creation of Swagger documentation."
     cmds:
-      - docker run --name="sched_app" -d -p 7540:7540 scheduler_app:v1
+      - swag init -q -g ./cmd/app/main.go
 
-  d_change_port: # название задачи для запуска
-    desc: "Run docker with changing default PORT."
+  create_db: # название задачи для запуска
+    desc: "Creates a database."
     cmds:
-      - docker run --name="sched_app" -e "TODO_PORT=7544" -d -p 7544:7544 scheduler_app:v1
+      - sudo -i -u postgres createdb library
 
-  d_change_pass: # название задачи для запуска
-    desc: "Run docker with changing default PASSWORD."
+  drop_db: # название задачи для запуска
+    desc: "Deletes the database."
     cmds:
-      - docker run --name="sched_app" -e "TODO_PASSWORD=yourPass" -d -p 7540:7540 scheduler_app:v1
-
-  d_change_path: # название задачи для запуска
-    desc: "Run docker with changing default database NAME and PATH."
-    cmds:
-      - docker run --name="sched_app" -e "TODO_DBFILE=internal/yourFolder/yourName.db" -d -p 7540:7540 scheduler_app:v1
-
-  d_change_all: # название задачи для запуска
-    desc: "Run docker with changing all default params."
-    cmds:
-      - docker run --name="sched_app" -e "TODO_DBFILE=internal/yourFolder/yourName.db" -e "TODO_PASSWORD=yourPass" -e "TODO_PORT=7544" -d -p 7544:7544 scheduler_app:v1
+      - sudo -i -u postgres dropdb library
